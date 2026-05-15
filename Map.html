@@ -3,60 +3,409 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>신성맵 2차 배송</title>
+<title>신성맵</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100%; height: 100%; font-family: sans-serif; }
-#header { background: #1a1a2e; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; height: 46px; border-bottom: 2px solid #4CAF50; position: fixed; top: 0; left: 0; right: 0; z-index: 9999; }
-#header h1 { font-size: 14px; color: #4CAF50; font-weight: 800; }
-#header span { font-size: 12px; color: #aaa; }
-#map { position: absolute; top: 46px; left: 0; right: 0; bottom: 0; }
-#status { position: fixed; top: 46px; left: 0; right: 0; background: rgba(0,0,0,0.7); color: #fff; font-size: 11px; text-align: center; padding: 3px; z-index: 999; }
-.leaflet-popup-content-wrapper { border-radius: 12px !important; padding: 0 !important; }
-.leaflet-popup-content { margin: 0 !important; }
-.info-popup { padding: 12px 14px; min-width: 210px; max-width: 260px; }
-.info-popup .pnum { font-size: 22px; font-weight: 900; color: #4CAF50; }
-.info-popup .pname { font-weight: 700; color: #222; font-size: 15px; margin: 3px 0; }
-.info-popup .paddr { color: #555; font-size: 11px; line-height: 1.5; margin-bottom: 6px; }
-.info-popup .pprod { background: #f0fff4; color: #2e7d32; padding: 4px 8px; border-radius: 6px; font-size: 11px; margin-bottom: 6px; }
-.info-popup .pmeta { color: #888; font-size: 11px; margin-bottom: 8px; }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { width:100%; height:100%; font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#0f1117; color:#f1f5f9; overflow:hidden; }
+#header { background:#0d1117; padding:0 14px; display:flex; align-items:center; justify-content:space-between; height:48px; border-bottom:2px solid #22c55e; position:fixed; top:0; left:0; right:0; z-index:9999; }
+#header h1 { font-size:15px; color:#22c55e; font-weight:800; }
+#header .hright { display:flex; align-items:center; gap:10px; }
+#count { font-size:12px; color:#94a3b8; }
+#upload-btn { background:#1e2a3a; color:#93c5fd; border:none; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; cursor:pointer; }
+#map { position:fixed; top:48px; left:0; right:0; bottom:54px; z-index:1; }
+#status { position:fixed; top:48px; left:0; right:0; background:rgba(0,0,0,0.82); color:#fff; font-size:11px; text-align:center; padding:4px; z-index:9000; display:none; }
+#order-bar { position:fixed; top:48px; left:0; right:0; background:rgba(10,15,25,0.97); border-bottom:1px solid #2a2d3a; padding:8px 12px; display:none; gap:8px; align-items:center; z-index:8999; flex-wrap:wrap; }
+#order-bar.show { display:flex; }
+#order-hint { font-size:11px; color:#64748b; flex:1; text-align:center; }
+.obar-btn { padding:7px 13px; border-radius:8px; border:none; font-size:12px; font-weight:700; cursor:pointer; }
+.obar-btn.undo { background:#1e2030; color:#f1f5f9; }
+.obar-btn.reset { background:#2a1a1a; color:#ef4444; }
+.obar-btn.save { background:#22c55e; color:white; }
+#order-badge { position:fixed; left:50%; transform:translateX(-50%); background:rgba(250,204,21,0.95); color:#1a1000; padding:6px 18px; border-radius:20px; font-size:12px; font-weight:700; z-index:8997; display:none; white-space:nowrap; }
+#order-badge.show { display:block; }
+#footer { position:fixed; bottom:0; left:0; right:0; height:54px; background:#0d1117; border-top:1px solid #2a2d3a; display:flex; z-index:9999; }
+.tab-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10px; color:#64748b; border:none; background:none; cursor:pointer; }
+.tab-btn.active { color:#22c55e; }
+.tab-btn .ico { font-size:20px; }
+#load-view { position:fixed; top:48px; left:0; right:0; bottom:54px; background:#0f1117; overflow-y:auto; z-index:8000; display:none; }
+#load-view.show { display:block; }
+.lv-head { background:#0d1117; padding:12px 16px; border-bottom:1px solid #2a2d3a; position:sticky; top:0; z-index:1; }
+.lv-title { font-size:15px; font-weight:800; color:#facc15; margin-bottom:3px; }
+.lv-sub { font-size:11px; color:#64748b; }
+.load-item { padding:12px 16px; border-bottom:1px solid #1e2130; display:flex; align-items:center; gap:12px; }
+.load-num { min-width:38px; height:38px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:900; color:white; flex-shrink:0; }
+.load-info { flex:1; overflow:hidden; }
+.load-name { font-size:13px; font-weight:700; margin-bottom:2px; }
+.load-addr { font-size:11px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.load-prod { font-size:11px; color:#86efac; margin-top:2px; }
+.load-right { text-align:right; flex-shrink:0; }
+.load-seq { font-size:13px; font-weight:900; color:#94a3b8; }
+.load-seq b { color:#f1f5f9; font-size:15px; }
+.badge { display:inline-block; padding:2px 7px; border-radius:6px; font-size:10px; font-weight:700; margin-left:4px; }
+.badge.cash { background:#2a1a0a; color:#f97316; }
+.badge.qty { background:#1a1a2a; color:#93c5fd; }
+#upload-view { position:fixed; top:48px; left:0; right:0; bottom:54px; background:#0f1117; overflow-y:auto; z-index:8000; display:none; padding:20px 16px; }
+#upload-view.show { display:block; }
+.drop-zone { border:2px dashed #2a2d3a; border-radius:16px; padding:40px 20px; text-align:center; cursor:pointer; background:#1a1d27; margin-bottom:16px; }
+.drop-zone .dico { font-size:48px; margin-bottom:12px; }
+.drop-zone p { font-size:14px; color:#64748b; }
+.drop-zone b { color:#22c55e; }
+.info-box { background:#1a1d27; border-radius:12px; padding:16px; margin-bottom:12px; font-size:12px; color:#64748b; line-height:1.8; }
+.info-box b { color:#f1f5f9; }
+.info-popup { padding:14px 16px; min-width:220px; max-width:270px; font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif; }
+.info-popup .pnum { font-size:24px; font-weight:900; color:#22c55e; margin-bottom:2px; }
+.info-popup .pnum.undone { color:#ef4444; }
+.info-popup .pname { font-weight:700; color:#111; font-size:15px; margin:3px 0; }
+.info-popup .paddr { color:#444; font-size:13px; line-height:1.6; margin-bottom:6px; font-weight:500; }
+.info-popup .pprod { background:#f0fff4; color:#2e7d32; padding:4px 8px; border-radius:6px; font-size:11px; margin-bottom:6px; }
+.info-popup .pmeta { color:#888; font-size:11px; margin-bottom:8px; }
 .info-popup .qty-tag { display:inline-block; background:#ff9800; color:white; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; margin-bottom:6px; }
-.kakao-btn { display:block; padding:8px; background:#FFCD00; color:#3C1E1E; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer; width:100%; text-align:center; text-decoration:none; margin-bottom:6px; }
-.done-btn { display:block; padding:8px; background:#4CAF50; color:white; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; width:100%; }
-.done-btn.undone { background: #aaa; }
+.info-popup .cash-tag { display:inline-block; background:#7c3500; color:#fed7aa; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:700; margin-bottom:6px; margin-left:4px; }
+.kakao-btn { display:block; padding:9px; background:#FFCD00; color:#3C1E1E; border:none; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer; width:100%; text-align:center; text-decoration:none; margin-bottom:6px; }
+.done-btn { display:block; padding:9px; background:#22c55e; color:white; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; width:100%; }
+.done-btn.undone { background:#475569; }
+.leaflet-popup-content-wrapper { border-radius:14px !important; padding:0 !important; }
+.leaflet-popup-content { margin:0 !important; }
 </style>
 </head>
 <body>
-<div id="header"><h1>🚚 신성맵 2차 배송</h1><span id="count">로딩 중...</span></div>
-<div id="status">주소 변환 중...</div>
+<div id="header">
+  <h1>🚚 신성맵</h1>
+  <div class="hright">
+    <span id="count">데이터 없음</span>
+    <button id="upload-btn" onclick="goTab('upload')">📤 업로드</button>
+  </div>
+</div>
+<div id="status"></div>
+<div id="order-bar">
+  <button class="obar-btn undo" id="btn-undo">↩ 되돌리기</button>
+  <span id="order-hint">핀을 탭해서 순번 지정</span>
+  <button class="obar-btn reset" id="btn-reset">🗑 초기화</button>
+  <button class="obar-btn save" id="btn-save">🔒 저장·확정</button>
+</div>
+<div id="order-badge">📌 순번 지정 모드</div>
 <div id="map"></div>
+<div id="load-view">
+  <div class="lv-head">
+    <div class="lv-title">📦 적재 순서 (차에 싣는 순서)</div>
+    <div class="lv-sub">마지막 배송지부터 → 1번 배송지를 맨 나중에 실으세요</div>
+  </div>
+  <div id="load-list"></div>
+</div>
+<div id="upload-view">
+  <div class="drop-zone" id="drop-zone">
+    <div class="dico">📊</div>
+    <p><b>천일택배 엑셀 파일 선택</b></p>
+    <p style="margin-top:6px;font-size:12px">.xlsx / .xls</p>
+  </div>
+  <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
+  <div class="info-box">
+    <b>⚠️ 주의</b><br>
+    새 파일 업로드 시 기존 데이터·순번·완료 기록이 모두 초기화됩니다.<br><br>
+    <b>순번 저장 후에는 순번 변경이 불가합니다.</b>
+  </div>
+  <div class="info-box">
+    <b>천일택배 도착화물내역 컬럼</b><br>
+    운송장번호 · 받는사람 · 주소 · 도착전화번호 · 상품명/등록품명 · 수량 · 현/착
+  </div>
+</div>
+<div id="footer">
+  <button class="tab-btn active" id="tab-map" onclick="goTab('map')"><span class="ico">🗺️</span>지도</button>
+  <button class="tab-btn" id="tab-order" onclick="goTab('order')"><span class="ico">📌</span>순번</button>
+  <button class="tab-btn" id="tab-load" onclick="goTab('load')"><span class="ico">📦</span>적재</button>
+  <button class="tab-btn" id="tab-upload" onclick="goTab('upload')"><span class="ico">📤</span>업로드</button>
+</div>
 <script>
-const REST_API_KEY='11a04ee8514fc04d127e70fd3efd9fe0';
-const DONE_KEY='shinsung_2nd_done';
-const COORDS_KEY='shinsung_2nd_coords';
-const deliveries=[{id:"1",name:"김소현",addr:"서울특별시 마포구 월드컵로34길 18 (성산동, 상암 수린나 오피스텔) 404호",product:"레이븐C :스카이블루+쿠션 -1개!",last4:"7239",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+월드컵로34길+18"},{id:"2",name:"윤땡호",addr:"서울특별시 마포구 동교로 47-10",product:"-",last4:"7933",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+동교로+47-10"},{id:"23-1",name:"박땡희",addr:"서울특별시 마포구 양화진4길 4-3",product:"카 토이 디스플레이 케이스",last4:"9281",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+양화진4길+4-3"},{id:"23-2",name:"문땡배",addr:"서울특별시 마포구 독막로28길 10 경남아너스빌 101동 703호",product:"골프 스윙 트레이너",last4:"0187",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+독막로28길+10"},{id:"23-3",name:"GL컴",addr:"서울특별시 마포구 성지길 45 지엘커 2층",product:"-",last4:"5051",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+성지길+45"},{id:"30-4",name:"하태웅",addr:"서울특별시 마포구 대흥로 36-10 b02호",product:"Fishing Rod",last4:"5554",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+대흥로+36-10"},{id:"31-1",name:"뱅크 서강대교점",addr:"서울 마포구 창전로 97",product:"타이어55/뱅크 서강대교점",last4:"3441",qty:6,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+창전로+97"},{id:"33-1",name:"달루나케츠",addr:"서울특별시 마포구 서강로 79 2층",product:"-",last4:"8410",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+서강로+79"},{id:"35-1",name:"김땡원",addr:"서울특별시 마포구 양화로 183 홍익인간 오피스텔 1305호",product:"-",last4:"8925",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+양화로+183"},{id:"41",name:"박기주",addr:"서울 마포구 월드컵로25길 26 마포영화블렌하임 101동701호",product:"에어컨배과덮개1",last4:"4557",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+월드컵로25길+26"},{id:"41-1",name:"창땡지",addr:"서울특별시 마포구 연남동 561-8",product:"뉴포니체어 하운드체크",last4:"8843",qty:2,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+연남동+561-8"},{id:"42",name:"성용휘",addr:"서울특별시 마포구 양화로 118 4층",product:"블럭깔판/4개",last4:"7061",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+양화로+118"},{id:"43",name:"김태훈",addr:"서울특별시 마포구 독막로9길 28 502호",product:"Office Chair Swivel Stool",last4:"4643",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+독막로9길+28"},{id:"44",name:"정땡환",addr:"서울특별시 마포구 동교로46길 40 지하 1층",product:"-",last4:"7540",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+동교로46길+40"},{id:"45",name:"설화",addr:"서울 마포구 상수동 335-18",product:"1000_힘찬획,빠른획",last4:"6965",qty:2,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+상수동+335-18"},{id:"46",name:"오수연 2/2",addr:"서울 마포구 연남로1길 50 2층",product:"홈리책장4단800",last4:"0077",qty:1,same_cnt:2,kakao:"https://map.kakao.com/?q=서울+마포구+연남로1길+50"},{id:"46-1",name:"이영미",addr:"서울특별시 마포구 토정로 158 103-1801",product:"선반",last4:"9978",qty:1,same_cnt:2,kakao:"https://map.kakao.com/?q=서울특별시+마포구+토정로+158"},{id:"47",name:"재윤",addr:"서울 마포구 독막로19길 20-8 302호",product:"몽제 딥슬립 매트리스 SS",last4:"5983",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+독막로19길+20-8"},{id:"47-1",name:"개땡주",addr:"서울특별시 마포구 동교로8길 34 한강에듀포레",product:"체어 화이트",last4:"7635",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+동교로8길+34"},{id:"48",name:"신유진",addr:"서울특별시 마포구 창전동 6-163 5층",product:"체코체어 내츄럴 *2",last4:"5395",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+창전동+6-163"},{id:"49",name:"오수연 1/2",addr:"서울 마포구 연남로1길 50 2층",product:"홈리책장4단800",last4:"0076",qty:1,same_cnt:2,kakao:"https://map.kakao.com/?q=서울+마포구+연남로1길+50"},{id:"50",name:"조땡우",addr:"서울특별시 마포구 마포대로 33 오피스텔 1402호",product:"거울",last4:"2438",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+마포대로+33"},{id:"53",name:"김용국",addr:"서울특별시 마포구 마포대로 33 오피스텔 1606호",product:"Curtain Motor Track",last4:"4503",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+마포대로+33"},{id:"54",name:"강보영님",addr:"서울특별시 마포구 서강로3길 32 101동 1502호",product:"꼬망세크림그레이 50*2",last4:"8996",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+서강로3길+32"},{id:"55",name:"김영익",addr:"서울특별시 마포구 서강로 75-16 101동 1004호",product:"루시책상800",last4:"3735",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+서강로+75-16"},{id:"57",name:"이*영",addr:"서울 마포구 토정로 158 101동 1603호",product:"MAMMUT 사각 화이트",last4:"1565",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+토정로+158"},{id:"59",name:"조땡호",addr:"서울특별시 마포구 광성로 20 큐브빌딩",product:"스쿨체어 내추럴",last4:"9033",qty:2,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+광성로+20"},{id:"60",name:"이수빈",addr:"서울 마포구 백범로 28 605호",product:"몽제 딥슬립 접이식 매트리스",last4:"6044",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+백범로+28"},{id:"60-1",name:"전상희",addr:"서울특별시 마포구 독막로 209 103동 901호",product:"T6335SS",last4:"4949",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+독막로+209"},{id:"62",name:"전성이",addr:"서울특별시 마포구 토정로 242 102동 104호",product:"우드_사각_와이드",last4:"5447",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+토정로+242"},{id:"64",name:"이하은",addr:"서울 마포구 백범로 102-1",product:"몽제 딥슬립 매트리스 SS",last4:"6001",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+백범로+102-1"},{id:"66",name:"이한주",addr:"서울 마포구 신촌로 170 상가1층 107호",product:"주방용품",last4:"1764",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+신촌로+170"},{id:"68",name:"이희승",addr:"서울 마포구 마포대로 67 1504호",product:"홈리책상1000",last4:"0035",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+마포대로+67"},{id:"69",name:"임지은",addr:"서울 마포구 도화동 82 1동 301호",product:"얄리아 체어 2개",last4:"2255",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울+마포구+도화동+82"},{id:"71",name:"윤땡일",addr:"서울특별시 마포구 잔다리로 48 2층",product:"-",last4:"9253",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+잔다리로+48"},{id:"72",name:"우리의행복보금자리",addr:"서울특별시 마포구 새창로 52 104동1002호",product:"글로비엔빅 V매트",last4:"8923",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+새창로+52"},{id:"73",name:"서충원",addr:"서울특별시 마포구 백범로37길 12 102동 1401호",product:"벤바텐PU 베이지 *2",last4:"5366",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+백범로37길+12"},{id:"73-1",name:"이땡",addr:"서울특별시 마포구 백범로25길 63 901호",product:"코코 선반",last4:"8480",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+백범로25길+63"},{id:"76",name:"허민",addr:"서울특별시 마포구 독막로 126 404호",product:"크리스탈_사각_315_전신경",last4:"5451",qty:1,same_cnt:1,kakao:"https://map.kakao.com/?q=서울특별시+마포구+독막로+126"}];
-const doneMap=(()=>{try{return JSON.parse(localStorage.getItem(DONE_KEY)||'{}')}catch{return{}}})();
-const coordCache=(()=>{try{return JSON.parse(localStorage.getItem(COORDS_KEY)||'{}')}catch{return{}}})();
-function saveDone(){localStorage.setItem(DONE_KEY,JSON.stringify(doneMap))}
-function saveCoords(){localStorage.setItem(COORDS_KEY,JSON.stringify(coordCache))}
-const map=L.map('map').setView([37.5600,126.9200],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(map);
-let myMarker=null,myCircle=null;
-navigator.geolocation&&navigator.geolocation.watchPosition(pos=>{const{latitude:lat,longitude:lng,accuracy:acc}=pos.coords;if(myMarker){myMarker.setLatLng([lat,lng]);myCircle.setLatLng([lat,lng]);myCircle.setRadius(acc)}else{myCircle=L.circle([lat,lng],{radius:acc,color:'#4285f4',fillColor:'#4285f4',fillOpacity:0.15,weight:1}).addTo(map);myMarker=L.circleMarker([lat,lng],{radius:9,color:'white',fillColor:'#4285f4',fillOpacity:1,weight:3}).addTo(map)}},null,{enableHighAccuracy:true,maximumAge:3000});
-const locBtn=L.control({position:'bottomright'});
-locBtn.onAdd=function(){const btn=L.DomUtil.create('button','');btn.innerHTML='📍';btn.style.cssText='width:40px;height:40px;background:white;border:2px solid #ccc;border-radius:8px;font-size:20px;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);';btn.onclick=()=>myMarker?map.setView(myMarker.getLatLng(),16):navigator.geolocation.getCurrentPosition(p=>map.setView([p.coords.latitude,p.coords.longitude],16));return btn};
-locBtn.addTo(map);
-const markerMap={};let done_count=0;const total=deliveries.length;
-function makeIcon(d){const isDone=doneMap[d.id];const bg=isDone?'#4CAF50':'#e94560';const label=isDone?'✓':d.id;const fs=String(label).length>3?'7px':String(label).length>2?'9px':'11px';return L.divIcon({className:'',html:`<div style="background:${bg};color:white;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:900;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);font-family:Arial">${label}</div>`,iconSize:[34,34],iconAnchor:[17,17],popupAnchor:[0,-20]})}
-function makePopup(d){const isDone=doneMap[d.id];const qtyTag=d.qty>1?`<div class="qty-tag">📦 수량 ${d.qty}개</div>`:'';return`<div class="info-popup"><div class="pnum">${d.id}번 ${isDone?'✅':''}</div>${qtyTag}<div class="pname">${d.name}</div><div class="paddr">${d.addr}</div><div class="pprod">${d.product}</div><div class="pmeta">송장뒷4자리: <b>${d.last4}</b></div><a class="kakao-btn" href="${d.kakao}" target="_blank">🗺️ 카카오맵으로 보기</a><button class="done-btn ${isDone?'undone':''}" onclick="toggleDone('${d.id}')">${isDone?'↩ 완료 취소':'✅ 배송 완료'}</button></div>`}
-function toggleDone(id){doneMap[id]=!doneMap[id];saveDone();const d=deliveries.find(x=>x.id===id);if(d){markerMap[id].setIcon(makeIcon(d));markerMap[id].setPopupContent(makePopup(d))}updateCount()}
-function updateCount(){const doneN=Object.values(doneMap).filter(Boolean).length;document.getElementById('count').textContent=`완료 ${doneN}/${total}건`}
-async function geocode(addr){if(coordCache[addr])return coordCache[addr];const url=`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(addr)}`;const res=await fetch(url,{headers:{'Authorization':`KakaoAK ${REST_API_KEY}`}});const json=await res.json();if(json.documents&&json.documents.length>0){const coord={lat:parseFloat(json.documents[0].y),lng:parseFloat(json.documents[0].x)};coordCache[addr]=coord;saveCoords();return coord}return null}
-async function addMarker(d){const coord=await geocode(d.addr);done_count++;document.getElementById('status').textContent=`변환 중 ${done_count}/${total}`;if(!coord)return;const marker=L.marker([coord.lat,coord.lng],{icon:makeIcon(d)}).addTo(map);marker.bindPopup(makePopup(d),{maxWidth:280});markerMap[d.id]=marker;if(done_count===total){document.getElementById('status').style.display='none';updateCount()}}
-async function loadAll(){for(const d of deliveries){await addMarker(d);await new Promise(r=>setTimeout(r,80))}}
-updateCount();loadAll();
+var KK='11a04ee8514fc04d127e70fd3efd9fe0';
+var KEY_DATA='ss_data',KEY_DONE='ss_done',KEY_COORDS='ss_coords',KEY_ORDER='ss_order',KEY_LOCKED='ss_locked';
+var D=[],doneMap={},coordCache={},orderMap={},orderHistory=[],isLocked=false,nextSeq=1;
+var markerMap={},myMarker=null,myCircle=null,currentTab='map';
+
+function load(k,def){try{return JSON.parse(localStorage.getItem(k))||def;}catch(e){return def;}}
+function save(k,v){localStorage.setItem(k,JSON.stringify(v));}
+
+function initState(){
+  D=load(KEY_DATA,[]);doneMap=load(KEY_DONE,{});coordCache=load(KEY_COORDS,{});
+  orderMap=load(KEY_ORDER,{});isLocked=load(KEY_LOCKED,false);
+  var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number';});
+  nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;
+}
+
+var map=L.map('map',{zoomControl:true}).setView([37.556,126.920],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+
+navigator.geolocation&&navigator.geolocation.watchPosition(function(pos){
+  var lat=pos.coords.latitude,lng=pos.coords.longitude,acc=pos.coords.accuracy;
+  if(myMarker){myMarker.setLatLng([lat,lng]);myCircle.setLatLng([lat,lng]);myCircle.setRadius(acc);}
+  else{
+    myCircle=L.circle([lat,lng],{radius:acc,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:0.15,weight:1}).addTo(map);
+    myMarker=L.circleMarker([lat,lng],{radius:9,color:'white',fillColor:'#3b82f6',fillOpacity:1,weight:3}).addTo(map);
+  }
+},null,{enableHighAccuracy:true,maximumAge:3000});
+
+var locCtrl=L.control({position:'bottomright'});
+locCtrl.onAdd=function(){
+  var btn=L.DomUtil.create('button','');
+  btn.innerHTML='📍';
+  btn.style.cssText='width:42px;height:42px;background:white;border:2px solid #ccc;border-radius:10px;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+  btn.onclick=function(){myMarker?map.setView(myMarker.getLatLng(),16):navigator.geolocation.getCurrentPosition(function(p){map.setView([p.coords.latitude,p.coords.longitude],16);});};
+  return btn;
+};
+locCtrl.addTo(map);
+
+function makeIcon(d){
+  var isDone=doneMap[d.id],seq=orderMap[d.id],isOrderMode=currentTab==='order';
+  var bg,label;
+  if(isOrderMode){bg=seq?'#f97316':'#6b7280';label=seq?String(seq):'·';}
+  else{bg=isDone?'#22c55e':(seq?'#ef4444':'#6b7280');label=isDone?'✓':(seq?String(seq):'·');}
+  var fs=String(label).length>3?'7px':String(label).length>2?'9px':'11px';
+  var size=isOrderMode?28:(seq?34:22);
+  return L.divIcon({
+    className:'',
+    html:'<div style="background:'+bg+';color:white;border-radius:50%;width:'+size+'px;height:'+size+'px;display:flex;align-items:center;justify-content:center;font-size:'+fs+';font-weight:900;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);">'+label+'</div>',
+    iconSize:[size,size],iconAnchor:[size/2,size/2],popupAnchor:[0,-size/2-4]
+  });
+}
+
+function makePopup(d){
+  var isDone=doneMap[d.id],seq=orderMap[d.id];
+  var qtyTag=d.qty>1?'<div class="qty-tag">📦 수량 '+d.qty+'개</div>':'';
+  var cashTag=d.cashon?'<span class="cash-tag">💰 착불</span>':'';
+  return '<div class="info-popup">'
+    +'<div class="pnum '+(isDone?'':'undone')+'">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'
+    +qtyTag+(cashTag?'<div>'+cashTag+'</div>':'')
+    +'<div class="pname">'+d.name+'</div>'
+    +'<div class="paddr">'+d.addr+'</div>'
+    +'<div class="pprod">'+(d.product||'-')+'</div>'
+    +'<div class="pmeta">📞 '+(d.phone||'-')+' &nbsp;·&nbsp; 송장뒷4자리: <b>'+String(d.tracking||'').slice(-4)+'</b></div>'
+    +'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'
+    +'<button class="done-btn '+(isDone?'undone':'')+'" onclick="toggleDone(\''+d.id+'\')">'+(isDone?'↩ 완료 취소':'✅ 배송 완료')+'</button>'
+    +'</div>';
+}
+
+function putMarker(d,coord){
+  if(markerMap[d.id])map.removeLayer(markerMap[d.id]);
+  var m=L.marker([coord.lat,coord.lng],{icon:makeIcon(d)}).addTo(map);
+  m.bindPopup(makePopup(d),{maxWidth:290});
+  (function(dd){m.on('click',function(){onMarkerClick(dd);});})(d);
+  markerMap[d.id]=m;
+}
+
+function refreshIcons(){
+  D.forEach(function(d){
+    if(markerMap[d.id]){markerMap[d.id].setIcon(makeIcon(d));markerMap[d.id].setPopupContent(makePopup(d));}
+  });
+}
+
+function onMarkerClick(d){
+  if(currentTab==='order'){
+    if(isLocked){alert('🔒 순번이 저장·확정되어 변경할 수 없습니다.');return;}
+    orderHistory.push(JSON.parse(JSON.stringify(orderMap)));
+    if(orderMap[d.id]){
+      delete orderMap[d.id];
+      var sorted=Object.entries(orderMap).sort(function(a,b){return a[1]-b[1];});
+      orderMap={};sorted.forEach(function(e,i){orderMap[e[0]]=i+1;});
+      nextSeq=sorted.length+1;
+    }else{orderMap[d.id]=nextSeq++;}
+    save(KEY_ORDER,orderMap);refreshIcons();updHint();
+  }else{
+    if(markerMap[d.id])markerMap[d.id].openPopup();
+  }
+}
+
+window.toggleDone=function(id){
+  doneMap[id]=!doneMap[id];save(KEY_DONE,doneMap);
+  var d=D.find(function(x){return x.id===id;});
+  if(d&&markerMap[id]){markerMap[id].setIcon(makeIcon(d));markerMap[id].setPopupContent(makePopup(d));}
+  updateCount();
+};
+
+function updateCount(){
+  var dn=Object.values(doneMap).filter(Boolean).length;
+  document.getElementById('count').textContent=D.length?'완료 '+dn+'/'+D.length+'건':'데이터 없음';
+}
+
+function updHint(){
+  var n=Object.keys(orderMap).length;
+  document.getElementById('order-hint').textContent=isLocked?'🔒 순번 확정됨 — 변경 불가':(n?n+'개 순번 지정됨':'핀을 탭해서 순번 지정');
+}
+
+function goTab(t){
+  currentTab=t;
+  ['map','order','load','upload'].forEach(function(id){
+    var btn=document.getElementById('tab-'+id);
+    if(btn)btn.classList.toggle('active',id===t);
+  });
+  document.getElementById('order-bar').classList.toggle('show',t==='order');
+  document.getElementById('order-badge').classList.toggle('show',t==='order');
+  document.getElementById('load-view').classList.toggle('show',t==='load');
+  document.getElementById('upload-view').classList.toggle('show',t==='upload');
+  var badge=document.getElementById('order-badge');
+  badge.style.top=t==='order'?(48+44+8)+'px':'60px';
+  if(t==='load')renderLoad();
+  refreshIcons();
+}
+
+document.getElementById('btn-undo').onclick=function(){
+  if(isLocked){alert('🔒 순번이 확정되어 되돌릴 수 없습니다.');return;}
+  if(!orderHistory.length)return;
+  orderMap=orderHistory.pop();
+  var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number';});
+  nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;
+  save(KEY_ORDER,orderMap);refreshIcons();updHint();
+};
+
+document.getElementById('btn-reset').onclick=function(){
+  if(isLocked){alert('🔒 순번이 확정되어 초기화할 수 없습니다.');return;}
+  if(!confirm('순번을 모두 초기화할까요?'))return;
+  orderHistory.push(JSON.parse(JSON.stringify(orderMap)));
+  orderMap={};nextSeq=1;save(KEY_ORDER,orderMap);refreshIcons();updHint();
+};
+
+document.getElementById('btn-save').onclick=function(){
+  if(isLocked){alert('🔒 이미 저장·확정된 순번입니다.');return;}
+  var n=Object.keys(orderMap).length;
+  if(!n){alert('지정된 순번이 없습니다.');return;}
+  if(!confirm('✅ '+n+'개 순번을 저장·확정합니다.\n\n저장 후에는 순번을 변경할 수 없습니다.\n계속할까요?'))return;
+  isLocked=true;save(KEY_ORDER,orderMap);save(KEY_LOCKED,true);
+  refreshIcons();updHint();
+  alert('🔒 순번이 확정되었습니다!\n\n적재 탭에서 싣는 순서를 확인하세요.');
+  goTab('map');
+};
+
+function renderLoad(){
+  var assigned=D.filter(function(d){return orderMap[d.id];}).sort(function(a,b){return orderMap[b.id]-orderMap[a.id];});
+  var unassigned=D.filter(function(d){return !orderMap[d.id];});
+  var h='';
+  if(!assigned.length){
+    h='<div style="padding:40px;text-align:center;color:#64748b">순번이 지정된 배송지가 없어요.<br>순번 탭에서 지정 후 저장해주세요.</div>';
+  }else{
+    h+='<div style="padding:8px 16px;font-size:11px;color:#64748b;background:#0a0c10;border-bottom:1px solid #1e2130">총 '+assigned.length+'개 · 아래 순서대로 차에 실으세요 ↓</div>';
+    assigned.forEach(function(d,i){
+      var loadNum=i+1,delivSeq=orderMap[d.id],isDone=doneMap[d.id],isFirst=i===0;
+      h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'">'
+        +'<div class="load-num" style="background:'+(isFirst?'#facc15':'#2a2d3a')+';color:'+(isFirst?'#1a1000':'#f1f5f9')+'">'+loadNum+'</div>'
+        +'<div class="load-info">'
+          +'<div class="load-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+(d.qty>1?'<span class="badge qty">×'+d.qty+'</span>':'')+'</div>'
+          +'<div class="load-addr">'+d.addr+'</div>'
+          +'<div class="load-prod">'+(d.product||'-')+'</div>'
+        +'</div>'
+        +'<div class="load-right"><div class="load-seq">배송<br><b>'+delivSeq+'번</b></div>'
+        +'<div style="font-size:10px;color:#64748b;margin-top:2px">송장 '+String(d.tracking||'').slice(-4)+'</div></div>'
+        +'</div>';
+    });
+    if(unassigned.length){
+      h+='<div style="padding:8px 16px;font-size:11px;color:#f97316;background:#1a0e00;border-top:2px solid #f97316">⚠️ 순번 미지정 '+unassigned.length+'건</div>';
+      unassigned.forEach(function(d){
+        h+='<div class="load-item"><div class="load-num" style="background:#2a1a00;color:#f97316">?</div>'
+          +'<div class="load-info"><div class="load-name">'+d.name+'</div>'
+          +'<div class="load-addr">'+d.addr+'</div>'
+          +'<div class="load-prod">'+(d.product||'-')+'</div></div>'
+          +'<div class="load-right"><div style="color:#f97316;font-size:11px">미지정</div></div></div>';
+      });
+    }
+  }
+  document.getElementById('load-list').innerHTML=h;
+}
+
+async function geocode(addr){
+  if(coordCache[addr])return coordCache[addr];
+  try{
+    var r=await fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(addr),{headers:{'Authorization':'KakaoAK '+KK}});
+    var j=await r.json();
+    if(j.documents&&j.documents[0]){
+      var c={lat:parseFloat(j.documents[0].y),lng:parseFloat(j.documents[0].x)};
+      coordCache[addr]=c;save(KEY_COORDS,coordCache);return c;
+    }
+  }catch(e){}
+  return null;
+}
+
+async function loadMarkers(){
+  var sb=document.getElementById('status');
+  sb.style.display='block';
+  var done=0;
+  for(var i=0;i<D.length;i++){
+    var d=D[i];
+    var c=await geocode(d.addr);
+    done++;
+    sb.textContent='주소 변환 중 '+done+'/'+D.length+' — '+d.name;
+    if(c)putMarker(d,c);
+    await new Promise(function(r){setTimeout(r,80);});
+  }
+  sb.style.display='none';
+  updateCount();
+  var coords=Object.values(coordCache);
+  if(coords.length>1){map.fitBounds(L.latLngBounds(coords.map(function(c){return[c.lat,c.lng];})),{padding:[40,40]});}
+}
+
+document.getElementById('drop-zone').onclick=function(){document.getElementById('file-input').click();};
+document.getElementById('file-input').addEventListener('change',function(e){
+  var file=e.target.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var wb=XLSX.read(ev.target.result,{type:'binary'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+
+      function cs(v){return(v===null||v===undefined)?'':String(v).trim();}
+
+      var hr=-1;
+      for(var i=0;i<rows.length;i++){
+        var r=rows[i];
+        if(!r||!Array.isArray(r))continue;
+        var joined=r.map(function(c){return cs(c);}).join('|');
+        if(joined.indexOf('운송장')>=0||(joined.indexOf('받는사람')>=0&&joined.indexOf('주소')>=0)){hr=i;break;}
+      }
+      if(hr===-1){alert('헤더 행을 찾지 못했어요.\n파일에 운송장번호·받는사람·주소 컬럼이 있는지 확인해주세요.');return;}
+
+      var hs=rows[hr].map(function(h){return cs(h);});
+      function gi(){
+        for(var ni=0;ni<arguments.length;ni++){
+          for(var hi=0;hi<hs.length;hi++){if(hs[hi].indexOf(arguments[ni])>=0)return hi;}
+        }
+        return -1;
+      }
+
+      var iN=gi('받는사람'),iA=gi('주소','받는사람주소'),iP=gi('도착전화번호','배송전화번호','받는사람전화');
+      var iPr=gi('상품명','품명'),iPr2=gi('등록품명'),iT=gi('운송장번호','운송장','송장');
+      var iQ=gi('수량'),iCA=gi('현/착','구분');
+
+      var nd=[];
+      for(var ri=hr+1;ri<rows.length;ri++){
+        var row=rows[ri];
+        if(!row||!Array.isArray(row))continue;
+        var addr=iA>=0?cs(row[iA]):'';
+        if(!addr||addr==='-')continue;
+        var name=iN>=0?(cs(row[iN])||'이름없음'):'이름없음';
+        var product='';
+        if(iPr>=0)product=cs(row[iPr]);
+        if(!product&&iPr2>=0)product=cs(row[iPr2]);
+        var cashStr=iCA>=0?cs(row[iCA]):'';
+        nd.push({id:'d'+ri,name:name,addr:addr,phone:iP>=0?cs(row[iP]):'',product:product,tracking:iT>=0?cs(row[iT]):'',qty:iQ>=0?(Number(row[iQ])||1):1,cashon:cashStr==='착불',type:'delivery'});
+      }
+
+      if(!nd.length){alert('데이터를 찾을 수 없어요.');return;}
+      if(!confirm('새 파일 '+nd.length+'건을 불러옵니다.\n기존 데이터·순번·완료 기록이 모두 초기화됩니다.\n계속할까요?'))return;
+
+      D=nd;doneMap={};orderMap={};orderHistory=[];isLocked=false;nextSeq=1;
+      save(KEY_DATA,D);save(KEY_DONE,doneMap);save(KEY_ORDER,orderMap);save(KEY_LOCKED,false);
+      Object.values(markerMap).forEach(function(m){map.removeLayer(m);});
+      markerMap={};updateCount();updHint();loadMarkers();goTab('map');
+      alert('✅ '+D.length+'건 업로드 완료!\n\n순번 탭에서 배송 순번을 지정해주세요.');
+    }catch(err){alert('파일 오류: '+err.message);}
+  };
+  reader.readAsBinaryString(file);
+  e.target.value='';
+});
+
+initState();updateCount();updHint();
+if(D.length>0)loadMarkers();
 </script>
 </body>
 </html>
