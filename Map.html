@@ -6,6 +6,7 @@
 <title>신성맵</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;overflow:hidden}
@@ -102,12 +103,14 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 <div id="load-list"></div>
 </div>
 <div id="scan-view">
-<div class="scan-title">📷 송장 스캔</div>
-<div class="scan-sub">사진을 찍으면 AI가 자동으로 읽어요. 잘못 읽힌 건 수정하세요.</div>
+<div class="scan-title">📷 송장 스캔 / 업로드</div>
+<div class="scan-sub">사진 찍기, 엑셀 업로드, 또는 직접 입력하세요.</div>
 <button class="scan-btn" onclick="document.getElementById('cam-input').click()"><span class="ico">📸</span> 카메라로 송장 찍기</button>
 <button class="scan-btn" style="background:#1a1a2b;border-color:#3b82f6;color:#93c5fd" onclick="document.getElementById('gal-input').click()"><span class="ico">🖼️</span> 갤러리에서 선택</button>
+<button class="scan-btn" style="background:#1a1a0a;border-color:#facc15;color:#facc15" onclick="document.getElementById('xl-input').click()"><span class="ico">📊</span> 엑셀 파일 업로드</button>
 <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none">
 <input type="file" id="gal-input" accept="image/*" style="display:none">
+<input type="file" id="xl-input" accept=".xlsx,.xls" style="display:none">
 <div id="scan-list"></div>
 <div class="manual-section">
 <div class="manual-title">✏️ 수동 직접 입력</div>
@@ -165,6 +168,40 @@ window.addScanItem=function(idx){var item=scanItems[idx];if(!item.addr){alert('�
 function handleImageFile(file){if(!file)return;document.getElementById('scan-list').insertAdjacentHTML('afterbegin','<div class="scan-loading">🤖 AI가 송장을 읽는 중...<br><small>잠시만 기다려주세요</small></div>');scanWaybill(file).then(function(result){document.querySelector('.scan-loading')&&document.querySelector('.scan-loading').remove();scanItems.unshift(result);renderScanList()}).catch(function(err){document.querySelector('.scan-loading')&&document.querySelector('.scan-loading').remove();scanItems.unshift({name:'',addr:'',phone:'',tracking:'',product:'',cashon:false});renderScanList();alert('AI 인식 실패. 직접 입력해주세요.\n('+err.message+')')})}
 document.getElementById('cam-input').addEventListener('change',function(e){handleImageFile(e.target.files[0]);e.target.value=''});
 document.getElementById('gal-input').addEventListener('change',function(e){handleImageFile(e.target.files[0]);e.target.value=''});
+document.getElementById('xl-input').addEventListener('change',function(e){
+var file=e.target.files[0];if(!file)return;
+var reader=new FileReader();
+reader.onload=function(ev){
+try{
+var wb=XLSX.read(ev.target.result,{type:'binary'});
+var ws=wb.Sheets[wb.SheetNames[0]];
+var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+function cs(v){return(v===null||v===undefined)?'':String(v).trim()}
+var hr=-1;
+for(var i=0;i<rows.length;i++){var r=rows[i];if(!r||!Array.isArray(r))continue;var joined=r.map(function(c){return cs(c)}).join('|');if(joined.indexOf('운송장')>=0||(joined.indexOf('받는사람')>=0&&joined.indexOf('주소')>=0)){hr=i;break}}
+if(hr===-1){alert('헤더 행을 찾지 못했어요.');return}
+var hs=rows[hr].map(function(h){return cs(h)});
+function gi(){for(var ni=0;ni<arguments.length;ni++){for(var hi=0;hi<hs.length;hi++){if(hs[hi].indexOf(arguments[ni])>=0)return hi}}return -1}
+var iN=gi('받는사람'),iA=gi('주소','받는사람주소'),iP=gi('도착전화번호','배송전화번호','받는사람전화');
+var iPr=gi('상품명','품명'),iPr2=gi('등록품명'),iT=gi('운송장번호','운송장','송장'),iQ=gi('수량'),iCA=gi('현/착','구분');
+var nd=[];
+for(var ri=hr+1;ri<rows.length;ri++){
+var row=rows[ri];if(!row||!Array.isArray(row))continue;
+var addr=iA>=0?cs(row[iA]):'';if(!addr||addr==='-')continue;
+var name=iN>=0?(cs(row[iN])||'이름없음'):'이름없음';
+var product='';if(iPr>=0)product=cs(row[iPr]);if(!product&&iPr2>=0)product=cs(row[iPr2]);
+var cashStr=iCA>=0?cs(row[iCA]):'';
+nd.push({id:uid(),name:name,addr:addr,phone:iP>=0?cs(row[iP]):'',product:product,tracking:iT>=0?cs(row[iT]):'',qty:iQ>=0?(Number(row[iQ])||1):1,cashon:cashStr==='착불'});
+}
+if(!nd.length){alert('데이터를 찾을 수 없어요.');return}
+if(!confirm('엑셀 '+nd.length+'건을 불러옵니다.\n기존 데이터는 유지됩니다.\n계속할까요?'))return;
+nd.forEach(function(d){D.push(d)});save(KEY_DATA,D);updateCount();
+loadMarkers();goTab('map');
+alert('✅ '+nd.length+'건 추가됐어요!');
+}catch(err){alert('파일 오류: '+err.message)}
+};
+reader.readAsBinaryString(file);e.target.value='';
+});
 window.addManual=function(){var name=document.getElementById('m-name').value.trim();var addr=document.getElementById('m-addr').value.trim();var phone=document.getElementById('m-phone').value.trim();var tracking=document.getElementById('m-tracking').value.trim();var product=document.getElementById('m-product').value.trim();if(!name){alert('이름을 입력해주세요!');return}if(!addr){alert('주소를 입력해주세요!');return}var d={id:uid(),name:name,addr:addr,phone:phone,product:product,tracking:tracking,qty:1,cashon:false};D.push(d);save(KEY_DATA,D);document.getElementById('m-name').value='';document.getElementById('m-addr').value='';document.getElementById('m-phone').value='';document.getElementById('m-tracking').value='';document.getElementById('m-product').value='';addMarkerForItem(d);updateCount();alert('✅ '+d.name+' 추가됐어요!')};
 async function addMarkerForItem(d){var c=await geocode(d.addr);if(c){putMarker(d,c);map.setView([c.lat,c.lng],15)}else{alert('⚠️ 주소를 지도에서 찾지 못했어요.\n주소 확인: '+d.addr)}}
 async function geocode(addr){if(coordCache[addr])return coordCache[addr];try{var r=await fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(addr),{headers:{'Authorization':'KakaoAK '+KK}});var j=await r.json();if(j.documents&&j.documents[0]){var c={lat:parseFloat(j.documents[0].y),lng:parseFloat(j.documents[0].x)};coordCache[addr]=c;save(KEY_COORDS,coordCache);return c}}catch(e){}return null}
