@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>신성맵</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;overflow:hidden}
+#header{position:fixed;top:0;left:0;right:0;height:48px;background:#0d1117;border-bottom:2px solid #22c55e;display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:9999}
+#header h1{font-size:15px;color:#22c55e;font-weight:800}
+#count{font-size:12px;color:#94a3b8}
+#map{position:fixed;top:48px;left:0;right:0;bottom:54px;z-index:1}
+#status{position:fixed;top:48px;left:0;right:0;background:rgba(0,0,0,0.85);color:#fff;font-size:11px;text-align:center;padding:4px;z-index:9000;display:none}
+#order-bar{position:fixed;top:48px;left:0;right:0;background:rgba(10,15,25,0.97);border-bottom:1px solid #2a2d3a;padding:8px 12px;display:none;gap:8px;align-items:center;flex-wrap:wrap;z-index:8999}
+#order-bar.show{display:flex}
+#order-hint{font-size:11px;color:#64748b;flex:1;text-align:center}
+.obar-btn{padding:7px 13px;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer}
+.obar-btn.undo{background:#1e2030;color:#f1f5f9}
+.obar-btn.reset{background:#2a1a1a;color:#ef4444}
+.obar-btn.save{background:#22c55e;color:white}
+#order-badge{position:fixed;left:50%;transform:translateX(-50%);top:108px;background:rgba(250,204,21,0.95);color:#1a1000;padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;z-index:8997;display:none;white-space:nowrap}
+#order-badge.show{display:block}
+#footer{position:fixed;bottom:0;left:0;right:0;height:54px;background:#0d1117;border-top:1px solid #2a2d3a;display:flex;z-index:9999}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:#64748b;border:none;background:none;cursor:pointer}
+.tab-btn.active{color:#22c55e}
+.tab-btn .ico{font-size:20px}
+#load-view{position:fixed;top:48px;left:0;right:0;bottom:54px;background:#0f1117;overflow-y:auto;z-index:8000;display:none}
+#load-view.show{display:block}
+.lv-head{background:#0d1117;padding:12px 16px;border-bottom:1px solid #2a2d3a;position:sticky;top:0;z-index:1}
+.lv-title{font-size:15px;font-weight:800;color:#facc15;margin-bottom:3px}
+.lv-sub{font-size:11px;color:#64748b}
+.load-item{padding:12px 16px;border-bottom:1px solid #1e2130;display:flex;align-items:center;gap:12px}
+.load-num{min-width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:white;flex-shrink:0}
+.load-info{flex:1;overflow:hidden}
+.load-name{font-size:13px;font-weight:700;margin-bottom:2px}
+.load-addr{font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.load-prod{font-size:11px;color:#86efac;margin-top:2px}
+.load-right{text-align:right;flex-shrink:0}
+.load-seq b{color:#f1f5f9;font-size:15px}
+.badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:700;margin-left:4px}
+.badge.cash{background:#2a1a0a;color:#f97316}
+.badge.qty{background:#1a1a2a;color:#93c5fd}
+.info-popup{padding:14px 16px;min-width:220px;max-width:270px}
+.info-popup .pnum{font-size:22px;font-weight:900;color:#22c55e;margin-bottom:2px}
+.info-popup .pnum.undone{color:#ef4444}
+.info-popup .pname{font-weight:700;color:#111;font-size:15px;margin:3px 0}
+.info-popup .paddr{color:#444;font-size:13px;line-height:1.6;margin-bottom:6px;font-weight:500}
+.info-popup .pprod{background:#f0fff4;color:#2e7d32;padding:4px 8px;border-radius:6px;font-size:11px;margin-bottom:6px}
+.info-popup .pmeta{color:#888;font-size:11px;margin-bottom:8px}
+.info-popup .qty-tag{display:inline-block;background:#ff9800;color:white;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;margin-bottom:6px}
+.info-popup .cash-tag{display:inline-block;background:#7c3500;color:#fed7aa;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;margin-bottom:6px;margin-left:4px}
+.kakao-btn{display:block;padding:9px;background:#FFCD00;color:#3C1E1E;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;width:100%;text-align:center;text-decoration:none;margin-bottom:6px}
+.done-btn{display:block;padding:9px;background:#22c55e;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%}
+.done-btn.undo{background:#475569}
+.leaflet-popup-content-wrapper{border-radius:14px!important;padding:0!important}
+.leaflet-popup-content{margin:0!important}
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>🚚 신성맵 — 5/16 도착</h1>
+  <span id="count">로딩 중...</span>
+</div>
+<div id="status"></div>
+<div id="order-bar">
+  <button class="obar-btn undo" id="btn-undo">↩ 되돌리기</button>
+  <span id="order-hint">핀을 탭해서 순번 지정</span>
+  <button class="obar-btn reset" id="btn-reset">🗑 초기화</button>
+  <button class="obar-btn save" id="btn-save">🔒 저장·확정</button>
+</div>
+<div id="order-badge">📌 순번 지정 모드</div>
+<div id="map"></div>
+<div id="load-view">
+  <div class="lv-head">
+    <div class="lv-title">📦 적재 순서 (차에 싣는 순서)</div>
+    <div class="lv-sub">마지막 배송지부터 → 1번을 맨 나중에 실으세요</div>
+  </div>
+  <div id="load-list"></div>
+</div>
+<div id="footer">
+  <button class="tab-btn active" id="tab-map" onclick="goTab('map')"><span class="ico">🗺️</span>지도</button>
+  <button class="tab-btn" id="tab-order" onclick="goTab('order')"><span class="ico">📌</span>순번</button>
+  <button class="tab-btn" id="tab-load" onclick="goTab('load')"><span class="ico">📦</span>적재</button>
+</div>
+<script>
+var KK='11a04ee8514fc04d127e70fd3efd9fe0';
+var KEY_DONE='ss_done3',KEY_COORDS='ss_coords3',KEY_ORDER='ss_order3',KEY_LOCKED='ss_locked3';
+var D=[
+  {id:'d1',name:'한유진',addr:'서울 마포구 망원로10길 10-7 망원동 301호',phone:'010-3996-4502',product:'',tracking:'52641605842',qty:1,cashon:false},
+  {id:'d2',name:'Tim',addr:'서울특별시 마포구 동교동 147-41 301호',phone:'010-7497-7003',product:'',tracking:'52641607367',qty:1,cashon:false},
+  {id:'d3',name:'김수연',addr:'서울특별시 마포구 연남동 566-12 꼭대기층',phone:'010-3150-6573',product:'',tracking:'52641607397',qty:1,cashon:false},
+  {id:'d4',name:'Tim(2)',addr:'서울특별시 마포구 동교동 147-41 301호',phone:'010-7497-7003',product:'',tracking:'52641607460',qty:1,cashon:false},
+  {id:'d5',name:'임해랑',addr:'서울특별시 마포구 양화로6길 57-18 서교동 틴틴빌딩 3층',phone:'010-7139-5887',product:'',tracking:'52641614118',qty:1,cashon:false},
+  {id:'d6',name:'김혜림',addr:'서울특별시 마포구 토정로31길 23 용강동 105동 701호',phone:'010-9488-2490',product:'',tracking:'52641617959',qty:1,cashon:false},
+  {id:'d7',name:'이선형',addr:'서울특별시 마포구 월드컵북로 45 지하1층 sd골프',phone:'010-5474-6948',product:'',tracking:'72601562785',qty:1,cashon:false},
+  {id:'d8',name:'유승태',addr:'서울특별시 마포구 월드컵로 240 서쪽 2층 월드컵컨벤션',phone:'010-5135-7751',product:'',tracking:'72601562837',qty:1,cashon:false},
+  {id:'d9',name:'박범준',addr:'서울특별시 마포구 월드컵북로 402 KGIT센터 1043호',phone:'010-8874-4280',product:'디앤엔아울솔루션',tracking:'72601563052',qty:1,cashon:false},
+  {id:'d10',name:'정윤섭',addr:'서울특별시 마포구 만리재로 74 신공덕래미안2차 205동 601호',phone:'010-2080-1827',product:'',tracking:'72601563591',qty:1,cashon:false},
+  {id:'d11',name:'임규빈',addr:'서울특별시 마포구 월드컵로31길 77 우림아파트 101동 705호',phone:'010-3144-5019',product:'',tracking:'72601564037',qty:1,cashon:false},
+  {id:'d12',name:'곽재민',addr:'서울특별시 마포구 어울마당로2길 18 204호',phone:'010-5209-5076',product:'',tracking:'72601564795',qty:1,cashon:false},
+  {id:'d13',name:'민병모',addr:'서울특별시 마포구 서교동 332-35 사주본가',phone:'010-9531-5874',product:'',tracking:'72601564836',qty:1,cashon:false},
+  {id:'d14',name:'조정헌',addr:'서울특별시 마포구 새창로8길 72 203동 202호',phone:'010-3009-5431',product:'',tracking:'72601564995',qty:1,cashon:false},
+  {id:'d15',name:'엄종운',addr:'서울특별시 마포구 월드컵북로15길 29 101호',phone:'010-6308-4896',product:'',tracking:'72601565088',qty:1,cashon:false},
+  {id:'d16',name:'여태훈',addr:'서울특별시 마포구 월드컵로 338 상암월드컵파크3단지 301동 402호',phone:'010-3222-3780',product:'',tracking:'72601565996',qty:1,cashon:false},
+  {id:'d17',name:'김대영',addr:'서울특별시 마포구 월드컵로42길 14 812동 508호',phone:'010-8868-2020',product:'',tracking:'72601566248',qty:1,cashon:false},
+  {id:'d18',name:'최성원',addr:'서울특별시 마포구 와우산로7길 35',phone:'010-9373-5759',product:'',tracking:'72601566463',qty:1,cashon:false},
+  {id:'d19',name:'조영진',addr:'서울특별시 마포구 신촌로 20 3층',phone:'010-3525-7407',product:'',tracking:'72601566820',qty:1,cashon:false},
+  {id:'d20',name:'전준형',addr:'서울특별시 마포구 포은로6길 34 101동 602호',phone:'010-8759-0801',product:'',tracking:'72603001747',qty:1,cashon:false},
+  {id:'d21',name:'선주영',addr:'서울특별시 마포구 동교로 142-11 1층',phone:'010-4143-8315',product:'',tracking:'72603001961',qty:1,cashon:false},
+  {id:'d22',name:'누보아트',addr:'서울 마포구 도화동 357',phone:'792-1333',product:'고체물감',tracking:'12641600867',qty:2,cashon:false},
+  {id:'d23',name:'심유나',addr:'서울 마포구 서교동 442-12 반지하 01호',phone:'010-9175-0426',product:'',tracking:'12641605951',qty:1,cashon:false},
+  {id:'d24',name:'박제민',addr:'서울 마포구 백범로16안길 33',phone:'010-9164-1873',product:'평상침대',tracking:'12641609842',qty:2,cashon:true},
+  {id:'d25',name:'서점정재희',addr:'서울특별시 마포구 동교로 64-9 합정동 2층',phone:'01030841134',product:'잡화',tracking:'12641610723',qty:1,cashon:false},
+  {id:'d26',name:'마포대진유치원',addr:'서울 마포구 성미산로 110',phone:'010-8456-1216',product:'우드보드',tracking:'12641616109',qty:1,cashon:false},
+  {id:'d27',name:'최재혁',addr:'서울 마포구 어울마당로 131',phone:'0502-1355-2527',product:'3M덕트',tracking:'12641617382',qty:1,cashon:false},
+  {id:'d28',name:'홍대포차',addr:'서울 마포구 잔다리로 9',phone:'010-9871-9113',product:'선반',tracking:'12641620893',qty:1,cashon:false},
+  {id:'d29',name:'최정우',addr:'서울 마포구 독막로 77 상수동 2층',phone:'010-4005-2097',product:'씽크600',tracking:'12641621015',qty:1,cashon:false},
+  {id:'d30',name:'누보아트(2)',addr:'서울 마포구 도화동 357',phone:'792-1333',product:'고체물감',tracking:'22641600868',qty:1,cashon:false},
+  {id:'d31',name:'박제민(2)',addr:'서울 마포구 백범로16안길 33',phone:'010-9164-1873',product:'평상침대',tracking:'22641609843',qty:1,cashon:true},
+  {id:'d32',name:'박경양',addr:'서울특별시 마포구 마포대로14길 29 공덕동 연리빌리지 402호',phone:'0502-4589-1047',product:'투투스툴 그레이',tracking:'52641593063',qty:1,cashon:false},
+  {id:'d33',name:'임성순',addr:'서울 마포구 마포대로24길 16 108동 804호',phone:'010-2107-4777',product:'와인',tracking:'52641593419',qty:1,cashon:false},
+  {id:'d34',name:'김유경 4/4',addr:'서울 마포구 포은로2가길 37-6 합정동 301호',phone:'010-3073-4295',product:'홈리책장3단600',tracking:'52641603559',qty:1,cashon:false},
+  {id:'d35',name:'김유경 3/4',addr:'서울 마포구 포은로2가길 37-6 합정동 301호',phone:'010-3073-4295',product:'홈리책장5단800',tracking:'52641603572',qty:1,cashon:false},
+  {id:'d36',name:'신지원 프레임',addr:'서울 마포구 고산길 48 노고산동 402호',phone:'010-4188-8385',product:'스피드랙 프레임',tracking:'52641604971',qty:1,cashon:false},
+  {id:'d37',name:'신지원 합판',addr:'서울 마포구 고산길 48 노고산동 402호',phone:'010-4188-8385',product:'스피드랙 합판',tracking:'52641605048',qty:1,cashon:false},
+  {id:'d38',name:'이난정',addr:'서울특별시 마포구 효창원로95길 45 공덕동 402호',phone:'010-2513-1535',product:'JR108 에쉬블루',tracking:'52641607306',qty:1,cashon:false},
+  {id:'d39',name:'이찬규 합판',addr:'서울특별시 마포구 서교동 385-15 남성빌딩 3층',phone:'0502-4698-0978',product:'스피드랙 합판',tracking:'52641611769',qty:1,cashon:false},
+  {id:'d40',name:'심응선',addr:'서울특별시 마포구 양화로7길 65 서교동',phone:'010-8888-0052',product:'가위',tracking:'52641612447',qty:1,cashon:false},
+  {id:'d41',name:'양종석 이지컨텍',addr:'서울특별시 마포구 방울내로 24-21 망원동 3층',phone:'010-9310-3668',product:'피피랙 선반',tracking:'52641613860',qty:2,cashon:false},
+  {id:'d42',name:'이준 프레임',addr:'서울특별시 마포구 양화로15안길 16 서교동 지하1층',phone:'010-2345-2101',product:'경량랙 프레임',tracking:'52641615524',qty:1,cashon:false},
+  {id:'d43',name:'이준 합판1',addr:'서울특별시 마포구 양화로15안길 16 서교동 지하1층',phone:'010-2345-2101',product:'경량랙 합판',tracking:'52641615556',qty:1,cashon:false},
+  {id:'d44',name:'이준 합판2',addr:'서울특별시 마포구 양화로15안길 16 서교동 지하1층',phone:'010-2345-2101',product:'경량랙 단추가',tracking:'52641615582',qty:1,cashon:false},
+  {id:'d45',name:'마포싱글트랙',addr:'서울특별시 마포구 망원동 420-18 1층',phone:'',product:'펄화이트',tracking:'52641616031',qty:1,cashon:false},
+  {id:'d46',name:'CUIYINZHU',addr:'서울특별시 마포구 성미산로1길 21 성산동 302호',phone:'010-5210-9113',product:'전신거울',tracking:'52641617475',qty:1,cashon:false},
+  {id:'d47',name:'이정엽',addr:'서울 마포구 월드컵북로5나길 18 서교동 대우미래아파트 835호',phone:'010-5898-5460',product:'파워워킹패드',tracking:'52641617633',qty:1,cashon:false},
+  {id:'d48',name:'김지수',addr:'서울특별시 마포구 망원로3길 37 망원동 2층',phone:'010-5803-1076',product:'공박스',tracking:'52641620282',qty:1,cashon:false},
+  {id:'d49',name:'합정사무실',addr:'서울특별시 마포구 성지길 25-20 합정동 201호',phone:'010-5335-8136',product:'우체국박스',tracking:'52641620296',qty:1,cashon:false},
+  {id:'d50',name:'맹주한',addr:'서울 마포구 상수동 72-1 홍익대학교',phone:'',product:'가스통거치대',tracking:'52641621545',qty:1,cashon:false},
+  {id:'d51',name:'양종석 이지컨텍(2)',addr:'서울특별시 마포구 방울내로 24-21 망원동 3층',phone:'010-9310-3668',product:'피피랙',tracking:'62641613861',qty:1,cashon:false},
+  {id:'d52',name:'강태수',addr:'서울특별시 마포구 마포대로24길 16 109동 1404호',phone:'010-9050-2772',product:'Carbon Fiber Spoiler',tracking:'72601563417',qty:1,cashon:false}
+];
+var doneMap={},coordCache={},orderMap={},orderHistory=[],isLocked=false,nextSeq=1;
+var markerMap={},myMarker=null,myCircle=null,currentTab='map';
+function load(k,def){try{return JSON.parse(localStorage.getItem(k))||def}catch(e){return def}}
+function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function initState(){
+  doneMap=load(KEY_DONE,{});coordCache=load(KEY_COORDS,{});
+  orderMap={};isLocked=false;
+  save(KEY_ORDER,orderMap);save(KEY_LOCKED,false);
+  nextSeq=1;
+}
+var map=L.map('map',{zoomControl:true}).setView([37.556,126.920],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+navigator.geolocation&&navigator.geolocation.watchPosition(function(pos){
+  var la=pos.coords.latitude,ln=pos.coords.longitude,ac=pos.coords.accuracy;
+  if(myMarker){myMarker.setLatLng([la,ln]);myCircle.setLatLng([la,ln]);myCircle.setRadius(ac)}
+  else{
+    myCircle=L.circle([la,ln],{radius:ac,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:0.15,weight:1}).addTo(map);
+    myMarker=L.circleMarker([la,ln],{radius:9,color:'white',fillColor:'#3b82f6',fillOpacity:1,weight:3}).addTo(map);
+  }
+},null,{enableHighAccuracy:true,maximumAge:3000});
+var locCtrl=L.control({position:'bottomright'});
+locCtrl.onAdd=function(){
+  var btn=L.DomUtil.create('button','');
+  btn.innerHTML='📍';
+  btn.style.cssText='width:42px;height:42px;background:white;border:2px solid #ccc;border-radius:10px;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);margin-bottom:60px';
+  btn.onclick=function(){myMarker?map.setView(myMarker.getLatLng(),16):navigator.geolocation.getCurrentPosition(function(p){map.setView([p.coords.latitude,p.coords.longitude],16)})};
+  return btn;
+};
+locCtrl.addTo(map);
+function makeIcon(d){
+  var isDone=doneMap[d.id],seq=orderMap[d.id],isOrd=currentTab==='order';
+  var bg,label;
+  if(isOrd){bg=seq?'#f97316':'#6b7280';label=seq?String(seq):'·'}
+  else{bg=isDone?'#22c55e':(seq?'#ef4444':'#6b7280');label=isDone?'✓':(seq?String(seq):'·')}
+  var fs=String(label).length>3?'7px':String(label).length>2?'9px':'11px';
+  var size=isOrd?28:(seq?34:22);
+  return L.divIcon({
+    className:'',
+    html:'<div style="background:'+bg+';color:white;border-radius:50%;width:'+size+'px;height:'+size+'px;display:flex;align-items:center;justify-content:center;font-size:'+fs+';font-weight:900;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)">'+label+'</div>',
+    iconSize:[size,size],iconAnchor:[size/2,size/2],popupAnchor:[0,-size/2-4]
+  });
+}
+function makePopup(d){
+  var isDone=doneMap[d.id],seq=orderMap[d.id];
+  var qtyTag=d.qty>1?'<div class="qty-tag">📦 수량 '+d.qty+'개</div>':'';
+  var cashTag=d.cashon?'<span class="cash-tag">💰 착불</span>':'';
+  return '<div class="info-popup">'
+    +'<div class="pnum '+(isDone?'':'undone')+'">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'
+    +qtyTag+(cashTag?'<div>'+cashTag+'</div>':'')
+    +'<div class="pname">'+d.name+'</div>'
+    +'<div class="paddr">'+d.addr+'</div>'
+    +(d.product?'<div class="pprod">'+d.product+'</div>':'')
+    +'<div class="pmeta">📞 '+(d.phone||'-')+' &nbsp;·&nbsp; 송장 <b>'+String(d.tracking).slice(-4)+'</b></div>'
+    +'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'
+    +'<button class="done-btn '+(isDone?'undo':'')+'\" onclick="toggleDone(\''+d.id+'\')">'+(isDone?'↩ 완료 취소':'✅ 배송 완료')+'</button>'
+    +'</div>';
+}
+function putMarker(d,coord){
+  if(markerMap[d.id])map.removeLayer(markerMap[d.id]);
+  var m=L.marker([coord.lat,coord.lng],{icon:makeIcon(d)}).addTo(map);
+  m.bindPopup(makePopup(d),{maxWidth:290});
+  (function(dd){m.on('click',function(){onMarkerClick(dd)})})(d);
+  markerMap[d.id]=m;
+}
+function refreshIcons(){
+  D.forEach(function(d){
+    if(markerMap[d.id]){markerMap[d.id].setIcon(makeIcon(d));markerMap[d.id].setPopupContent(makePopup(d))}
+  });
+}
+function onMarkerClick(d){
+  if(currentTab==='order'){
+    if(isLocked){alert('🔒 순번이 확정되어 변경할 수 없습니다.');return}
+    orderHistory.push(JSON.parse(JSON.stringify(orderMap)));
+    if(orderMap[d.id]){
+      delete orderMap[d.id];
+      var s=Object.entries(orderMap).sort(function(a,b){return a[1]-b[1]});
+      orderMap={};s.forEach(function(e,i){orderMap[e[0]]=i+1});
+      nextSeq=s.length+1;
+    }else{orderMap[d.id]=nextSeq++}
+    save(KEY_ORDER,orderMap);refreshIcons();updHint();
+  }else{
+    if(markerMap[d.id])markerMap[d.id].openPopup();
+  }
+}
+window.toggleDone=function(id){
+  doneMap[id]=!doneMap[id];save(KEY_DONE,doneMap);
+  var d=D.find(function(x){return x.id===id});
+  if(d&&markerMap[id]){markerMap[id].setIcon(makeIcon(d));markerMap[id].setPopupContent(makePopup(d))}
+  updateCount();
+};
+function updateCount(){
+  var dn=Object.values(doneMap).filter(Boolean).length;
+  document.getElementById('count').textContent='완료 '+dn+'/'+D.length+'건';
+}
+function updHint(){
+  var n=Object.keys(orderMap).length;
+  document.getElementById('order-hint').textContent=isLocked?'🔒 순번 확정됨':(n?n+'개 순번 지정됨':'핀을 탭해서 순번 지정');
+}
+function goTab(t){
+  currentTab=t;
+  ['map','order','load'].forEach(function(id){
+    var b=document.getElementById('tab-'+id);if(b)b.classList.toggle('active',id===t);
+  });
+  document.getElementById('order-bar').classList.toggle('show',t==='order');
+  document.getElementById('order-badge').classList.toggle('show',t==='order');
+  document.getElementById('load-view').classList.toggle('show',t==='load');
+  if(t==='load')renderLoad();
+  refreshIcons();
+}
+document.getElementById('btn-undo').onclick=function(){
+  if(isLocked){alert('🔒 확정된 순번입니다.');return}
+  if(!orderHistory.length)return;
+  orderMap=orderHistory.pop();
+  var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});
+  nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;
+  save(KEY_ORDER,orderMap);refreshIcons();updHint();
+};
+document.getElementById('btn-reset').onclick=function(){
+  if(isLocked){alert('🔒 확정된 순번입니다.');return}
+  if(!confirm('순번을 모두 초기화할까요?'))return;
+  orderHistory.push(JSON.parse(JSON.stringify(orderMap)));
+  orderMap={};nextSeq=1;save(KEY_ORDER,orderMap);refreshIcons();updHint();
+};
+document.getElementById('btn-save').onclick=function(){
+  if(isLocked){alert('🔒 이미 확정된 순번입니다.');return}
+  var n=Object.keys(orderMap).length;
+  if(!n){alert('지정된 순번이 없습니다.');return}
+  if(!confirm(n+'개 순번을 저장·확정합니다.\n저장 후 변경 불가합니다.\n계속할까요?'))return;
+  isLocked=true;save(KEY_ORDER,orderMap);save(KEY_LOCKED,true);
+  refreshIcons();updHint();
+  alert('🔒 순번 확정!\n적재 탭에서 싣는 순서를 확인하세요.');
+  goTab('map');
+};
+var loadSortMode='tracking';
+function renderLoad(){
+  var assigned=D.filter(function(d){return orderMap[d.id]});
+  var unassigned=D.filter(function(d){return !orderMap[d.id]});
+  if(loadSortMode==='tracking'){
+    assigned.sort(function(a,b){return String(b.tracking).slice(-4).localeCompare(String(a.tracking).slice(-4))});
+  }else{
+    assigned.sort(function(a,b){return orderMap[b.id]-orderMap[a.id]});
+  }
+  var h='';
+  if(!assigned.length){
+    h='<div style="padding:40px;text-align:center;color:#64748b">순번 지정 후 저장해주세요.</div>';
+  }else{
+    h+='<div style="padding:8px 12px;background:#0a0c10;border-bottom:1px solid #1e2130;display:flex;align-items:center;justify-content:space-between">'
+      +'<span style="font-size:11px;color:#64748b">총 '+assigned.length+'개</span>'
+      +'<div style="display:flex;gap:6px">'
+      +'<button onclick="setLoadSort(\'tracking\')" style="padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:'+(loadSortMode==='tracking'?'#facc15':'#2a2d3a')+';color:'+(loadSortMode==='tracking'?'#1a1000':'#94a3b8')+'">송장번호순</button>'
+      +'<button onclick="setLoadSort(\'order\')" style="padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:'+(loadSortMode==='order'?'#22c55e':'#2a2d3a')+';color:'+(loadSortMode==='order'?'white':'#94a3b8')+'">적재순서</button>'
+      +'</div></div>';
+    assigned.forEach(function(d,i){
+      var delivSeq=orderMap[d.id];
+      var isDone=doneMap[d.id];
+      var t4=String(d.tracking).slice(-4);
+      var loadNum=loadSortMode==='order'?(i+1):'';
+      var numBg=loadSortMode==='order'&&i===0?'#facc15':'#2a2d3a';
+      var numColor=loadSortMode==='order'&&i===0?'#1a1000':'#f1f5f9';
+      h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'">'
+        +'<div class="load-num" style="background:'+numBg+';color:'+numColor+'">'
+        +(loadSortMode==='tracking'?('<b style="font-size:15px;color:#facc15">'+t4+'</b>'):loadNum)
+        +'</div>'
+        +'<div class="load-info">'
+          +'<div class="load-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+(d.qty>1?'<span class="badge qty">×'+d.qty+'</span>':'')+'</div>'
+          +'<div class="load-addr">'+d.addr+'</div>'
+          +(d.product?'<div class="load-prod">'+d.product+'</div>':'')
+        +'</div>'
+        +'<div class="load-right">'
+        +'<div class="load-seq">배송<br><b>'+delivSeq+'번</b></div>'
+        +(loadSortMode==='order'?'<div style="font-size:11px;color:#facc15;font-weight:700;margin-top:2px">'+t4+'</div>':'')
+        +'</div>'
+        +'</div>';
+    });
+    if(unassigned.length){
+      h+='<div style="padding:8px 16px;font-size:11px;color:#f97316;background:#1a0e00;border-top:2px solid #f97316">⚠️ 순번 미지정 '+unassigned.length+'건</div>';
+      unassigned.forEach(function(d){
+        h+='<div class="load-item"><div class="load-num" style="background:#2a1a00;color:#f97316">?</div>'
+          +'<div class="load-info"><div class="load-name">'+d.name+'</div>'
+          +'<div class="load-addr">'+d.addr+'</div></div>'
+          +'<div class="load-right"><div style="color:#f97316;font-size:11px">미지정</div></div></div>';
+      });
+    }
+  }
+  document.getElementById('load-list').innerHTML=h;
+}
+window.setLoadSort=function(mode){loadSortMode=mode;renderLoad();};
+async function geocode(addr){
+  if(coordCache[addr])return coordCache[addr];
+  try{
+    var r=await fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(addr),{headers:{'Authorization':'KakaoAK '+KK}});
+    var j=await r.json();
+    if(j.documents&&j.documents[0]){
+      var c={lat:parseFloat(j.documents[0].y),lng:parseFloat(j.documents[0].x)};
+      coordCache[addr]=c;save(KEY_COORDS,coordCache);return c;
+    }
+  }catch(e){}
+  return null;
+}
+async function loadMarkers(){
+  var sb=document.getElementById('status');sb.style.display='block';
+  var done=0;
+  for(var i=0;i<D.length;i++){
+    var d=D[i],c=await geocode(d.addr);
+    done++;sb.textContent='주소 변환 중 '+done+'/'+D.length+' — '+d.name;
+    if(c)putMarker(d,c);
+    await new Promise(function(r){setTimeout(r,80)});
+  }
+  sb.style.display='none';updateCount();
+  var coords=Object.values(coordCache);
+  if(coords.length>1)map.fitBounds(L.latLngBounds(coords.map(function(c){return[c.lat,c.lng]})),{padding:[40,40]});
+}
+initState();updateCount();updHint();loadMarkers();
+</script>
+</body>
+</html>
