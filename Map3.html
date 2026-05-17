@@ -147,8 +147,8 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 <button class="tab-btn" id="tab-scan" onclick="goTab('scan')"><span class="ico">📷</span>추가</button>
 </div><script>
 var KK='11a04ee8514fc04d127e70fd3efd9fe0';
-var KEY_DATA='ss_data5',KEY_DONE='ss_done5',KEY_COORDS='ss_coords5',KEY_ORDER='ss_order5',KEY_LOCKED='ss_locked5';
-var KEY_RET='ss_ret5',KEY_RDONE='ss_rdone5';
+var KEY_DATA='ss_data6',KEY_DONE='ss_done6',KEY_COORDS='ss_coords6',KEY_ORDER='ss_order6',KEY_LOCKED='ss_locked6';
+var KEY_RET='ss_ret6',KEY_RDONE='ss_rdone6';
 var D=[],R=[],doneMap={},retDoneMap={},coordCache={},orderMap={},orderHistory=[],isLocked=false,nextSeq=1;
 var markerMap={},retMarkerMap={},myMarker=null,myCircle=null,currentTab='map',loadSortMode='tracking';
 var scanItems=[];
@@ -217,12 +217,10 @@ function makeIcon(d){
   var size=isOrd?28:(seq?34:22);
   return L.divIcon({className:'',html:'<div style="background:'+bg+';color:white;border-radius:50%;width:'+size+'px;height:'+size+'px;display:flex;align-items:center;justify-content:center;font-size:'+fs+';font-weight:900;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)">'+label+'</div>',iconSize:[size,size],iconAnchor:[size/2,size/2],popupAnchor:[0,-size/2-4]});
 }
-
 function makeRetIcon(r){
   var isDone=retDoneMap[r.id];
   return L.divIcon({className:'',html:'<div style="background:'+(isDone?'#22c55e':'#a78bfa')+';color:white;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)">'+(isDone?'✓':'↩')+'</div>',iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-20]});
 }
-
 function makePopup(d){
   var isDone=doneMap[d.id],seq=orderMap[d.id];
   var qtyTag=d.qty>1?'<div class="qty-tag">📦 수량 '+d.qty+'개</div>':'';
@@ -242,7 +240,6 @@ function makePopup(d){
     +'<button class="done-btn '+(isDone?'undo':'')+'\" onclick="toggleDone(\''+d.id+'\')">'+(isDone?'↩ 완료 취소':'✅ 배송 완료')+'</button>'
     +'</div>';
 }
-
 function makeRetPopup(r){
   var isDone=retDoneMap[r.id];
   return '<div class="info-popup">'
@@ -255,7 +252,6 @@ function makeRetPopup(r){
     +'<button class="done-btn ret '+(isDone?'undo':'')+'\" onclick="toggleRetDone(\''+r.id+'\')">'+(isDone?'↩ 수거 취소':'✅ 반품 수거 완료')+'</button>'
     +'</div>';
 }
-
 function putMarker(d,coord){
   if(markerMap[d.id])map.removeLayer(markerMap[d.id]);
   var m=L.marker([coord.lat,coord.lng],{icon:makeIcon(d)}).addTo(map);
@@ -263,19 +259,16 @@ function putMarker(d,coord){
   (function(dd){m.on('click',function(){onMarkerClick(dd)})})(d);
   markerMap[d.id]=m;
 }
-
 function putRetMarker(r,coord){
   if(retMarkerMap[r.id])map.removeLayer(retMarkerMap[r.id]);
   var m=L.marker([coord.lat,coord.lng],{icon:makeRetIcon(r)}).addTo(map);
   m.bindPopup(makeRetPopup(r),{maxWidth:290});
   retMarkerMap[r.id]=m;
 }
-
 function refreshIcons(){
   D.forEach(function(d){if(markerMap[d.id]){markerMap[d.id].setIcon(makeIcon(d));markerMap[d.id].setPopupContent(makePopup(d))}});
   R.forEach(function(r){if(retMarkerMap[r.id]){retMarkerMap[r.id].setIcon(makeRetIcon(r));retMarkerMap[r.id].setPopupContent(makeRetPopup(r))}});
 }
-
 function onMarkerClick(d){
   if(currentTab==='order'){
     if(isLocked){
@@ -283,8 +276,7 @@ function onMarkerClick(d){
       if(!input||isNaN(Number(input)))return;
       var insertAt=Number(input);
       Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});
-      orderMap[d.id]=insertAt;
-      nextSeq=Math.max.apply(null,Object.values(orderMap))+1;
+      orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;
       save(KEY_ORDER,orderMap);refreshIcons();updHint();return;
     }
     map.closePopup();
@@ -297,7 +289,6 @@ function onMarkerClick(d){
     save(KEY_ORDER,orderMap);refreshIcons();updHint();
   }else{if(markerMap[d.id])markerMap[d.id].openPopup()}
 }
-
 window.toggleDone=function(id){
   doneMap[id]=!doneMap[id];save(KEY_DONE,doneMap);
   var d=D.find(function(x){return x.id===id});
@@ -310,7 +301,6 @@ window.toggleRetDone=function(id){
   if(r&&retMarkerMap[id]){retMarkerMap[id].setIcon(makeRetIcon(r));retMarkerMap[id].setPopupContent(makeRetPopup(r))}
   updateCount();
 };
-
 function updateCount(){
   var dn=Object.values(doneMap).filter(Boolean).length;
   var rn=Object.values(retDoneMap).filter(Boolean).length;
@@ -330,11 +320,9 @@ function goTab(t){
   if(t==='load')renderLoad();
   refreshIcons();
 }
-
 document.getElementById('btn-undo').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!orderHistory.length)return;orderMap=orderHistory.pop();var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;save(KEY_ORDER,orderMap);refreshIcons();updHint()};
 document.getElementById('btn-reset').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!confirm('순번을 모두 초기화할까요?'))return;orderHistory.push(JSON.parse(JSON.stringify(orderMap)));orderMap={};nextSeq=1;save(KEY_ORDER,orderMap);refreshIcons();updHint()};
 document.getElementById('btn-save').onclick=function(){if(isLocked){alert('🔒 이미 확정된 순번입니다.');return}var n=Object.keys(orderMap).length;if(!n){alert('지정된 순번이 없습니다.');return}if(!confirm(n+'개 순번을 저장·확정합니다.\n저장 후 변경 불가합니다.\n계속할까요?'))return;isLocked=true;save(KEY_ORDER,orderMap);save(KEY_LOCKED,true);refreshIcons();updHint();alert('🔒 순번 확정!\n적재 탭에서 싣는 순서를 확인하세요.');goTab('map')};
-
 function renderLoad(){
   var assigned=D.filter(function(d){return orderMap[d.id]});
   var unassigned=D.filter(function(d){return !orderMap[d.id]});
@@ -358,19 +346,14 @@ function renderLoad(){
     }
     if(R.length){
       h+='<div style="padding:8px 16px;font-size:11px;color:#a78bfa;background:#1a1030;border-top:2px solid #a78bfa">↩ 반품 수거 '+R.length+'건</div>';
-      R.forEach(function(r){
-        var isDone=retDoneMap[r.id];
-        h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+(isDone?'#22c55e':'#7c3aed')+';color:white;border-radius:4px">↩</div><div class="load-info"><div class="load-name">'+r.name+'<span class="badge ret">반품</span></div><div class="load-addr">'+r.addr+'</div>'+(r.reason?'<div class="load-prod" style="color:#a78bfa">'+r.reason+'</div>':'')+'</div><div class="load-right"><div style="font-size:10px;color:#64748b">'+(r.tracking?String(r.tracking).slice(-4):'')+'</div></div></div>';
-      });
+      R.forEach(function(r){var isDone=retDoneMap[r.id];h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+(isDone?'#22c55e':'#7c3aed')+';color:white;border-radius:4px">↩</div><div class="load-info"><div class="load-name">'+r.name+'<span class="badge ret">반품</span></div><div class="load-addr">'+r.addr+'</div>'+(r.reason?'<div class="load-prod" style="color:#a78bfa">'+r.reason+'</div>':'')+'</div><div class="load-right"><div style="font-size:10px;color:#64748b">'+(r.tracking?String(r.tracking).slice(-4):'')+'</div></div></div>'});
     }
   }
   document.getElementById('load-list').innerHTML=h;
 }
 window.setLoadSort=function(mode){loadSortMode=mode;renderLoad()};
-
 function imgToBase64(file){return new Promise(function(res){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1])};r.readAsDataURL(file)})}
 async function scanWaybill(file){var base64=await imgToBase64(file);var mediaType=file.type||'image/jpeg';var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mediaType,data:base64}},{type:'text',text:'이 송장 이미지에서 배송 정보를 추출해주세요. 반드시 JSON 형식으로만 답하세요.\n{"name":"받는사람이름","addr":"받는사람전체주소","phone":"전화번호","tracking":"운송장번호","product":"품명","cashon":false}\n착불이면 cashon을 true로. 정보가 없는 항목은 빈 문자열로.'}]}]})});var data=await resp.json();return JSON.parse(data.content.map(function(i){return i.text||''}).join('').replace(/```json|```/g,'').trim())}
-
 function renderScanList(){
   var el=document.getElementById('scan-list');if(!scanItems.length){el.innerHTML='';return}
   var h='';
@@ -434,7 +417,6 @@ document.getElementById('xl-input').addEventListener('change',function(e){
   };
   reader.readAsBinaryString(file);e.target.value='';
 });
-
 window.addManual=function(){
   var name=document.getElementById('m-name').value.trim();
   var addr=document.getElementById('m-addr').value.trim();
@@ -451,7 +433,6 @@ window.addManual=function(){
   addMarkerForItem(d);refreshIcons();updateCount();
   alert('✅ '+d.name+' 추가됐어요!'+(seqInput?' ('+seqInput+'번으로 끼워넣기)':''));
 };
-
 window.addReturn=function(){
   var name=document.getElementById('r-name').value.trim();
   var addr=document.getElementById('r-addr').value.trim();
@@ -466,15 +447,12 @@ window.addReturn=function(){
   addRetMarkerForItem(r);updateCount();
   alert('↩ '+r.name+' 반품 등록됐어요!');
 };
-
 async function addMarkerForItem(d){var c=await geocode(d.addr);if(c){putMarker(d,c);map.setView([c.lat,c.lng],15)}else{alert('⚠️ 주소를 지도에서 찾지 못했어요.\n주소 확인: '+d.addr)}}
 async function addRetMarkerForItem(r){var c=await geocode(r.addr);if(c){putRetMarker(r,c);map.setView([c.lat,c.lng],15)}else{alert('⚠️ 주소를 지도에서 찾지 못했어요.\n주소 확인: '+r.addr)}}
-
 async function geocode(addr){
   if(coordCache[addr])return coordCache[addr];
   try{var res=await fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(addr),{headers:{'Authorization':'KakaoAK '+KK}});var j=await res.json();if(j.documents&&j.documents[0]){var c={lat:parseFloat(j.documents[0].y),lng:parseFloat(j.documents[0].x)};coordCache[addr]=c;save(KEY_COORDS,coordCache);return c}}catch(e){}return null;
 }
-
 async function loadMarkers(){
   if(!D.length&&!R.length)return;
   var sb=document.getElementById('status');sb.style.display='block';
@@ -489,7 +467,6 @@ async function loadMarkers(){
   var coords=Object.values(coordCache);
   if(coords.length>1)map.fitBounds(L.latLngBounds(coords.map(function(c){return[c.lat,c.lng]})),{padding:[40,40]});
 }
-
 initState();updateCount();updHint();
 if(D.length>0||R.length>0)loadMarkers();
 </script>
