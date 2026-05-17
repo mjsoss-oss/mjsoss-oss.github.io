@@ -147,8 +147,8 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 <button class="tab-btn" id="tab-scan" onclick="goTab('scan')"><span class="ico">📷</span>추가</button>
 </div><script>
 var KK='11a04ee8514fc04d127e70fd3efd9fe0';
-var KEY_DATA='ss_data6',KEY_DONE='ss_done6',KEY_COORDS='ss_coords6',KEY_ORDER='ss_order6',KEY_LOCKED='ss_locked6';
-var KEY_RET='ss_ret6',KEY_RDONE='ss_rdone6';
+var KEY_DATA='ss_data7',KEY_DONE='ss_done7',KEY_COORDS='ss_coords7',KEY_ORDER='ss_order7',KEY_LOCKED='ss_locked7';
+var KEY_RET='ss_ret7',KEY_RDONE='ss_rdone7';
 var D=[],R=[],doneMap={},retDoneMap={},coordCache={},orderMap={},orderHistory=[],isLocked=false,nextSeq=1;
 var markerMap={},retMarkerMap={},myMarker=null,myCircle=null,currentTab='map',loadSortMode='tracking';
 var scanItems=[];
@@ -169,11 +169,9 @@ navigator.geolocation&&navigator.geolocation.watchPosition(function(pos){
   if(myMarker){myMarker.setLatLng([la,ln]);myCircle.setLatLng([la,ln]);myCircle.setRadius(ac)}
   else{myCircle=L.circle([la,ln],{radius:ac,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:0.15,weight:1}).addTo(map);myMarker=L.circleMarker([la,ln],{radius:9,color:'white',fillColor:'#3b82f6',fillOpacity:1,weight:3}).addTo(map)}
 },null,{enableHighAccuracy:true,maximumAge:3000});
-
 var locCtrl=L.control({position:'bottomright'});
 locCtrl.onAdd=function(){var btn=L.DomUtil.create('button','');btn.innerHTML='📍';btn.style.cssText='width:42px;height:42px;background:white;border:2px solid #ccc;border-radius:10px;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);margin-bottom:60px';btn.onclick=function(){myMarker?map.setView(myMarker.getLatLng(),16):navigator.geolocation.getCurrentPosition(function(p){map.setView([p.coords.latitude,p.coords.longitude],16)})};return btn};
 locCtrl.addTo(map);
-
 var delCtrl=L.control({position:'topright'});
 delCtrl.onAdd=function(){
   var div=L.DomUtil.create('div','');
@@ -188,8 +186,7 @@ delCtrl.onAdd=function(){
     targets.forEach(function(d){if(markerMap[d.id]){map.removeLayer(markerMap[d.id]);delete markerMap[d.id]}delete doneMap[d.id];delete orderMap[d.id]});
     D=D.filter(function(d){return !targets.find(function(t){return t.id===d.id})});
     save(KEY_DATA,D);save(KEY_DONE,doneMap);save(KEY_ORDER,orderMap);
-    updateCount();updHint();
-    alert('✅ '+targets.length+'개 삭제됐어요!');
+    updateCount();updHint();alert('✅ '+targets.length+'개 삭제됐어요!');
   });
   var btn2=L.DomUtil.create('button','',div);
   btn2.innerHTML='⚫ 미지정 삭제';
@@ -201,13 +198,11 @@ delCtrl.onAdd=function(){
     targets.forEach(function(d){if(markerMap[d.id]){map.removeLayer(markerMap[d.id]);delete markerMap[d.id]}delete doneMap[d.id]});
     D=D.filter(function(d){return !targets.find(function(t){return t.id===d.id})});
     save(KEY_DATA,D);save(KEY_DONE,doneMap);
-    updateCount();updHint();
-    alert('⚫ '+targets.length+'개 삭제됐어요!');
+    updateCount();updHint();alert('⚫ '+targets.length+'개 삭제됐어요!');
   });
   return div;
 };
 delCtrl.addTo(map);
-
 function makeIcon(d){
   var isDone=doneMap[d.id],seq=orderMap[d.id],isOrd=currentTab==='order';
   var bg,label;
