@@ -147,8 +147,8 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 <button class="tab-btn" id="tab-scan" onclick="goTab('scan')"><span class="ico">📷</span>추가</button>
 </div><script>
 var KK='11a04ee8514fc04d127e70fd3efd9fe0';
-var KEY_DATA='ss_data7',KEY_DONE='ss_done7',KEY_COORDS='ss_coords7',KEY_ORDER='ss_order7',KEY_LOCKED='ss_locked7';
-var KEY_RET='ss_ret7',KEY_RDONE='ss_rdone7';
+var KEY_DATA='ss_data8',KEY_DONE='ss_done8',KEY_COORDS='ss_coords8',KEY_ORDER='ss_order8',KEY_LOCKED='ss_locked8';
+var KEY_RET='ss_ret8',KEY_RDONE='ss_rdone8';
 var D=[],R=[],doneMap={},retDoneMap={},coordCache={},orderMap={},orderHistory=[],isLocked=false,nextSeq=1;
 var markerMap={},retMarkerMap={},myMarker=null,myCircle=null,currentTab='map',loadSortMode='tracking';
 var scanItems=[];
@@ -199,6 +199,17 @@ delCtrl.onAdd=function(){
     D=D.filter(function(d){return !targets.find(function(t){return t.id===d.id})});
     save(KEY_DATA,D);save(KEY_DONE,doneMap);
     updateCount();updHint();alert('⚫ '+targets.length+'개 삭제됐어요!');
+  });
+  var btn3=L.DomUtil.create('button','',div);
+  btn3.innerHTML='🗑 전체 삭제';
+  btn3.style.cssText='padding:6px 10px;background:#2a0a0a;color:#ef4444;border:1px solid #ef4444;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3)';
+  L.DomEvent.on(btn3,'click',function(){
+    if(!confirm('배송 목록 전체를 삭제할까요?\n순번·완료 기록도 모두 초기화됩니다.'))return;
+    D=[];R=[];doneMap={};retDoneMap={};orderMap={};isLocked=false;nextSeq=1;
+    save(KEY_DATA,D);save(KEY_DONE,doneMap);save(KEY_ORDER,orderMap);save(KEY_LOCKED,false);save(KEY_RET,R);save(KEY_RDONE,retDoneMap);
+    Object.values(markerMap).forEach(function(m){map.removeLayer(m)});markerMap={};
+    Object.values(retMarkerMap).forEach(function(m){map.removeLayer(m)});retMarkerMap={};
+    updateCount();updHint();alert('🗑 전체 삭제 완료!');
   });
   return div;
 };
