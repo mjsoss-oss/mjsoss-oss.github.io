@@ -28,6 +28,8 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:#64748b;border:none;background:none;cursor:pointer}
 .tab-btn.active{color:#22c55e}
 .tab-btn .ico{font-size:18px}
+#order-view{position:fixed;top:48px;left:0;right:0;bottom:54px;background:#0f1117;overflow-y:auto;z-index:8000;display:none}
+#order-view.show{display:block}
 #load-view{position:fixed;top:48px;left:0;right:0;bottom:54px;background:#0f1117;overflow-y:auto;z-index:8000;display:none}
 #load-view.show{display:block}
 .lv-head{background:#0d1117;padding:12px 16px;border-bottom:1px solid #2a2d3a;position:sticky;top:0;z-index:1}
@@ -45,6 +47,14 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 .badge.cash{background:#2a1a0a;color:#f97316}
 .badge.qty{background:#1a1a2a;color:#93c5fd}
 .badge.ret{background:#1a1a3a;color:#a78bfa}
+.unassigned-item{padding:12px 16px;border-bottom:1px solid #1e2130;display:flex;align-items:center;gap:10px}
+.unassigned-info{flex:1;overflow:hidden}
+.unassigned-name{font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:3px}
+.unassigned-addr{font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unassigned-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.kakao-small{padding:5px 8px;background:#FFCD00;color:#3C1E1E;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
+.seq-input{width:52px;padding:5px 6px;background:#1a1d27;border:1px solid #2a2d3a;border-radius:6px;color:#f1f5f9;font-size:12px;text-align:center}
+.seq-assign-btn{padding:5px 8px;background:#22c55e;color:white;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
 #scan-view{position:fixed;top:48px;left:0;right:0;bottom:54px;background:#0f1117;overflow-y:auto;z-index:8000;display:none;padding:16px}
 #scan-view.show{display:block}
 .scan-title{font-size:15px;font-weight:800;color:#22c55e;margin-bottom:4px}
@@ -106,6 +116,13 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 </div>
 <div id="order-badge">📌 순번 지정 모드</div>
 <div id="map"></div>
+<div id="order-view">
+<div class="lv-head">
+<div class="lv-title">📌 미지정 배송지 목록</div>
+<div class="lv-sub">카카오맵으로 위치 확인 후 순번 입력하세요</div>
+</div>
+<div id="unassigned-list"></div>
+</div>
 <div id="load-view">
 <div class="lv-head"><div class="lv-title">📦 적재 순서</div><div class="lv-sub">마지막 배송지부터 → 1번을 맨 나중에 실으세요</div></div>
 <div id="load-list"></div>
@@ -316,18 +333,54 @@ function updHint(){
   var n=Object.keys(orderMap).length;
   document.getElementById('order-hint').textContent=isLocked?'🔒 순번 확정됨':(n?n+'개 순번 지정됨':'핀을 탭해서 순번 지정');
 }
+function renderUnassigned(){
+  var unassigned=D.filter(function(d){return !orderMap[d.id]&&!doneMap[d.id]});
+  var el=document.getElementById('unassigned-list');
+  if(!unassigned.length){
+    el.innerHTML='<div style="padding:40px;text-align:center;color:#64748b">미지정 배송지가 없어요! 🎉</div>';
+    return;
+  }
+  var h='<div style="padding:8px 16px;font-size:11px;color:#f97316;background:#1a0e00;border-bottom:2px solid #f97316">⚠️ 미지정 '+unassigned.length+'건 — 카카오맵으로 위치 확인 후 순번 입력</div>';
+  unassigned.forEach(function(d){
+    h+='<div class="unassigned-item">'
+      +'<div class="unassigned-info">'
+      +'<div class="unassigned-name">'+d.name+(d.product?' <span style="font-size:10px;color:#86efac">'+d.product+'</span>':'')+'</div>'
+      +'<div class="unassigned-addr">'+d.addr+'</div>'
+      +'</div>'
+      +'<div class="unassigned-actions">'
+      +'<a class="kakao-small" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️</a>'
+      +'<input class="seq-input" type="number" placeholder="순번" id="seq-'+d.id+'">'
+      +'<button class="seq-assign-btn" onclick="assignSeq(\''+d.id+'\')">지정</button>'
+      +'</div>'
+      +'</div>';
+  });
+  el.innerHTML=h;
+}
+window.assignSeq=function(id){
+  var input=document.getElementById('seq-'+id);
+  var val=Number(input.value);
+  if(!val||isNaN(val)){alert('순번을 입력해주세요!');return}
+  orderHistory.push(JSON.parse(JSON.stringify(orderMap)));
+  Object.keys(orderMap).forEach(function(oid){if(orderMap[oid]>=val)orderMap[oid]+=1});
+  orderMap[id]=val;
+  nextSeq=Math.max.apply(null,Object.values(orderMap))+1;
+  save(KEY_ORDER,orderMap);refreshIcons();updHint();renderUnassigned();
+  alert('✅ 순번 '+val+'번으로 지정됐어요!');
+};
 function goTab(t){
   currentTab=t;
   ['map','order','load','scan'].forEach(function(id){var b=document.getElementById('tab-'+id);if(b)b.classList.toggle('active',id===t)});
-  document.getElementById('order-bar').classList.toggle('show',t==='order');
+  document.getElementById('order-bar').classList.toggle('show',t==='order'&&!isLocked);
   document.getElementById('order-badge').classList.toggle('show',t==='order');
+  document.getElementById('order-view').classList.toggle('show',t==='order');
   document.getElementById('load-view').classList.toggle('show',t==='load');
   document.getElementById('scan-view').classList.toggle('show',t==='scan');
+  if(t==='order')renderUnassigned();
   if(t==='load')renderLoad();
   refreshIcons();
 }
-document.getElementById('btn-undo').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!orderHistory.length)return;orderMap=orderHistory.pop();var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;save(KEY_ORDER,orderMap);refreshIcons();updHint()};
-document.getElementById('btn-reset').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!confirm('순번을 모두 초기화할까요?'))return;orderHistory.push(JSON.parse(JSON.stringify(orderMap)));orderMap={};nextSeq=1;save(KEY_ORDER,orderMap);refreshIcons();updHint()};
+document.getElementById('btn-undo').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!orderHistory.length)return;orderMap=orderHistory.pop();var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;save(KEY_ORDER,orderMap);refreshIcons();updHint();renderUnassigned()};
+document.getElementById('btn-reset').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!confirm('순번을 모두 초기화할까요?'))return;orderHistory.push(JSON.parse(JSON.stringify(orderMap)));orderMap={};nextSeq=1;save(KEY_ORDER,orderMap);refreshIcons();updHint();renderUnassigned()};
 document.getElementById('btn-save').onclick=function(){if(isLocked){alert('🔒 이미 확정된 순번입니다.');return}var n=Object.keys(orderMap).length;if(!n){alert('지정된 순번이 없습니다.');return}if(!confirm(n+'개 순번을 저장·확정합니다.\n저장 후 변경 불가합니다.\n계속할까요?'))return;isLocked=true;save(KEY_ORDER,orderMap);save(KEY_LOCKED,true);refreshIcons();updHint();alert('🔒 순번 확정!\n적재 탭에서 싣는 순서를 확인하세요.');goTab('map')};
 function renderLoad(){
   var assigned=D.filter(function(d){return orderMap[d.id]});
