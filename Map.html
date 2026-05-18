@@ -48,6 +48,7 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 #header{position:fixed;top:0;left:0;right:0;height:48px;background:#0d1117;border-bottom:2px solid #22c55e;display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:9999}
 #header h1{font-size:14px;color:#22c55e;font-weight:800;cursor:pointer}
 #count{font-size:11px;color:#94a3b8}
+/* 지도는 항상 표시 */
 #map{position:fixed;top:48px;left:0;right:0;bottom:54px;z-index:1}
 #status{position:fixed;top:48px;left:0;right:0;background:rgba(0,0,0,0.85);color:#fff;font-size:11px;text-align:center;padding:4px;z-index:9000;display:none}
 #order-bar{position:fixed;top:48px;left:0;right:0;background:rgba(10,15,25,0.97);border-bottom:1px solid #2a2d3a;padding:8px 12px;display:none;gap:8px;align-items:center;flex-wrap:wrap;z-index:8999}
@@ -63,11 +64,11 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:#64748b;border:none;background:none;cursor:pointer}
 .tab-btn.active{color:#22c55e}
 .tab-btn .ico{font-size:18px}
-/* 미지정 목록 - 지도 위에 하단 패널로 표시 */
-#unassigned-panel{position:fixed;left:0;right:0;bottom:54px;background:#0f1117;border-top:2px solid #f97316;z-index:8500;display:none;flex-direction:column;max-height:45vh}
+/* 미지정 패널 - 지도 위 하단에 뜸 */
+#unassigned-panel{position:fixed;left:0;right:0;bottom:54px;background:#0f1117;border-top:2px solid #f97316;z-index:500;display:none;flex-direction:column}
 #unassigned-panel.show{display:flex}
 #unassigned-panel-head{padding:8px 16px;background:#1a0e00;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-#unassigned-panel-list{overflow-y:auto;flex:1}
+#unassigned-panel-body{max-height:35vh;overflow-y:auto}
 #load-view{position:fixed;top:48px;left:0;right:0;bottom:54px;background:#0f1117;overflow-y:auto;z-index:8000;display:none}
 #load-view.show{display:block}
 .lv-head{background:#0d1117;padding:12px 16px;border-bottom:1px solid #2a2d3a;position:sticky;top:0;z-index:1}
@@ -177,13 +178,12 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
   </div>
   <div id="order-badge">📌 순번 지정 모드</div>
   <div id="map"></div>
-  <!-- 미지정 패널 - 지도 위에 하단에 뜸 -->
   <div id="unassigned-panel">
     <div id="unassigned-panel-head">
       <span style="font-size:12px;font-weight:700;color:#f97316" id="unassigned-count-label">⚠️ 미지정 0건</span>
-      <button onclick="togglePanel()" style="background:none;border:none;color:#94a3b8;font-size:12px;cursor:pointer">▼ 접기</button>
+      <button onclick="togglePanel()" id="panel-toggle-btn" style="background:none;border:none;color:#94a3b8;font-size:12px;cursor:pointer;padding:4px 8px">▲ 접기</button>
     </div>
-    <div id="unassigned-panel-list"></div>
+    <div id="unassigned-panel-body"></div>
   </div>
   <div id="load-view">
     <div class="lv-head"><div class="lv-title">📦 적재 순서</div><div class="lv-sub">마지막 배송지부터 → 1번을 맨 나중에 실으세요</div></div>
@@ -237,7 +237,6 @@ var scanItems=[],failedAddrs=[],panelOpen=true;
 function load(k,def){try{var v=JSON.parse(localStorage.getItem(k));return(v===null||v===undefined)?def:v}catch(e){return def}}
 function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
 function uid(){return 'd'+Date.now()+Math.random().toString(36).slice(2,6)}
-
 function getSessions(){return load(KEY_SESSIONS,[])}
 function saveSessions(s){save(KEY_SESSIONS,s)}
 
@@ -268,9 +267,7 @@ function openDelivery(key,title){
 
 function goHome(){
   var sessions=getSessions();
-  sessions.forEach(function(s){
-    if(s.key===currentKey){s.total=D.length;s.done=Object.values(doneMap).filter(Boolean).length}
-  });
+  sessions.forEach(function(s){if(s.key===currentKey){s.total=D.length;s.done=Object.values(doneMap).filter(Boolean).length}});
   saveSessions(sessions);
   document.getElementById('app').classList.remove('show');
   document.getElementById('home-view').classList.remove('hide');
@@ -286,19 +283,14 @@ function goHome(){
 function renderHome(){
   var sessions=getSessions();
   var el=document.getElementById('delivery-list');
-  if(!sessions.length){
-    el.innerHTML='<div class="empty-home"><div class="ico">🗺️</div><div>배송이 없어요.<br>위 버튼으로 새 배송을 만드세요!</div></div>';
-    return;
-  }
+  if(!sessions.length){el.innerHTML='<div class="empty-home"><div class="ico">🗺️</div><div>배송이 없어요.<br>위 버튼으로 새 배송을 만드세요!</div></div>';return}
   var h='';
   sessions.forEach(function(s){
     var pct=s.total?Math.round(s.done/s.total*100):0;
     var isDone=s.total>0&&s.done>=s.total;
     h+='<div class="delivery-card'+(isDone?' done-card':'')+'" onclick="openDelivery(\''+s.key+'\',\''+s.title+'\')">'
-      +'<div><div class="dc-date">🚚 '+s.title+'</div>'
-      +'<div class="dc-stats">완료 '+s.done+'/'+(s.total||0)+'건'+(s.total?' ('+pct+'%)':'')+'</div></div>'
-      +'<div class="dc-badge '+(isDone?'done':'active')+'">'+(isDone?'완료':'진행중')+'</div>'
-      +'</div>';
+      +'<div><div class="dc-date">🚚 '+s.title+'</div><div class="dc-stats">완료 '+s.done+'/'+(s.total||0)+'건'+(s.total?' ('+pct+'%)':'')+'</div></div>'
+      +'<div class="dc-badge '+(isDone?'done':'active')+'">'+(isDone?'완료':'진행중')+'</div></div>';
   });
   el.innerHTML=h;
 }
@@ -310,9 +302,11 @@ navigator.geolocation&&navigator.geolocation.watchPosition(function(pos){
   if(myMarker){myMarker.setLatLng([la,ln]);myCircle.setLatLng([la,ln]);myCircle.setRadius(ac)}
   else{myCircle=L.circle([la,ln],{radius:ac,color:'#3b82f6',fillColor:'#3b82f6',fillOpacity:0.15,weight:1}).addTo(map);myMarker=L.circleMarker([la,ln],{radius:9,color:'white',fillColor:'#3b82f6',fillOpacity:1,weight:3}).addTo(map)}
 },null,{enableHighAccuracy:true,maximumAge:3000});
+
 var locCtrl=L.control({position:'bottomright'});
 locCtrl.onAdd=function(){var btn=L.DomUtil.create('button','');btn.innerHTML='📍';btn.style.cssText='width:42px;height:42px;background:white;border:2px solid #ccc;border-radius:10px;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);margin-bottom:60px';btn.onclick=function(){myMarker?map.setView(myMarker.getLatLng(),16):navigator.geolocation.getCurrentPosition(function(p){map.setView([p.coords.latitude,p.coords.longitude],16)})};return btn};
 locCtrl.addTo(map);
+
 var delCtrl=L.control({position:'topright'});
 delCtrl.onAdd=function(){
   var div=L.DomUtil.create('div','');div.style.cssText='display:flex;flex-direction:column;gap:6px;margin-top:8px;margin-right:4px';
@@ -357,8 +351,7 @@ function makePopup(d){
   return '<div class="info-popup">'
     +'<div class="pnum '+(isDone?'':'undone')+'\">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'
     +'<div style="margin-bottom:6px">'+qtyTag+cashTag+'</div>'
-    +'<div class="pname">'+d.name+'</div>'
-    +'<div class="paddr">'+d.addr+'</div>'
+    +'<div class="pname">'+d.name+'</div><div class="paddr">'+d.addr+'</div>'
     +(products?'<div class="pprod">'+products+'</div>':'')
     +'<div style="margin-bottom:6px">'+trackings+'</div>'
     +'<div class="pmeta">📞 '+(d.phone||'-')+'</div>'
@@ -438,40 +431,39 @@ function updHint(){
   var n=Object.keys(orderMap).length;
   document.getElementById('order-hint').textContent=isLocked?'🔒 순번 확정됨':(n?n+'개 순번 지정됨':'핀 탭해서 순번 지정');
 }
-
-// 미지정 패널 (지도 위에 하단 패널)
 function renderUnassignedPanel(){
   var unassigned=D.filter(function(d){return !orderMap[d.id]&&!doneMap[d.id]});
-  var label=document.getElementById('unassigned-count-label');
   var panel=document.getElementById('unassigned-panel');
+  var label=document.getElementById('unassigned-count-label');
   if(currentTab!=='order'){panel.classList.remove('show');return}
+  panel.classList.add('show');
   if(!unassigned.length){
     label.textContent='✅ 미지정 없음';
-    document.getElementById('unassigned-panel-list').innerHTML='<div style="padding:12px 16px;font-size:12px;color:#22c55e">모든 배송지 순번 지정 완료!</div>';
-  }else{
-    label.textContent='⚠️ 미지정 '+unassigned.length+'건';
-    var h='';
-    unassigned.forEach(function(d){
-      h+='<div class="unassigned-item">'
-        +'<div class="unassigned-info"><div class="unassigned-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+'</div><div class="unassigned-addr">'+d.addr+'</div></div>'
-        +'<div class="unassigned-actions">'
-        +'<a class="kakao-small" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️</a>'
-        +'<input class="seq-input" type="number" placeholder="순번" id="seq-'+d.id+'">'
-        +'<button class="seq-assign-btn" onclick="assignSeq(\''+d.id+'\')">지정</button>'
-        +'</div></div>';
-    });
-    document.getElementById('unassigned-panel-list').innerHTML=h;
+    label.style.color='#22c55e';
+    document.getElementById('unassigned-panel-body').innerHTML='<div style="padding:10px 16px;font-size:12px;color:#22c55e">모든 배송지 순번 지정 완료! 🎉</div>';
+    return;
   }
-  panel.classList.add('show');
+  label.textContent='⚠️ 미지정 '+unassigned.length+'건';
+  label.style.color='#f97316';
+  if(!panelOpen){return}
+  var h='';
+  unassigned.forEach(function(d){
+    h+='<div class="unassigned-item">'
+      +'<div class="unassigned-info"><div class="unassigned-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+'</div><div class="unassigned-addr">'+d.addr+'</div></div>'
+      +'<div class="unassigned-actions">'
+      +'<a class="kakao-small" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️</a>'
+      +'<input class="seq-input" type="number" placeholder="순번" id="seq-'+d.id+'">'
+      +'<button class="seq-assign-btn" onclick="assignSeq(\''+d.id+'\')">지정</button>'
+      +'</div></div>';
+  });
+  document.getElementById('unassigned-panel-body').innerHTML=h;
 }
-
 window.togglePanel=function(){
-  var list=document.getElementById('unassigned-panel-list');
-  var btn=document.querySelector('#unassigned-panel-head button');
-  if(panelOpen){list.style.display='none';btn.textContent='▲ 펼치기';panelOpen=false}
-  else{list.style.display='';btn.textContent='▼ 접기';panelOpen=true}
+  var body=document.getElementById('unassigned-panel-body');
+  var btn=document.getElementById('panel-toggle-btn');
+  if(panelOpen){body.style.display='none';btn.textContent='▼ 펼치기';panelOpen=false}
+  else{body.style.display='';btn.textContent='▲ 접기';panelOpen=true;renderUnassignedPanel()}
 };
-
 window.assignSeq=function(id){
   var input=document.getElementById('seq-'+id);
   var val=Number(input.value);
@@ -485,12 +477,12 @@ window.assignSeq=function(id){
   refreshIcons();updHint();renderUnassignedPanel();
   alert('✅ '+val+'번으로 지정됐어요!');
 };
-
 function goTab(t){
   currentTab=t;
   ['map','order','load','scan'].forEach(function(id){var b=document.getElementById('tab-'+id);if(b)b.classList.toggle('active',id===t)});
   document.getElementById('order-bar').classList.toggle('show',t==='order');
   document.getElementById('order-badge').classList.toggle('show',t==='order');
+  // 지도는 load/scan 탭에서만 숨김
   document.getElementById('load-view').classList.toggle('show',t==='load');
   document.getElementById('scan-view').classList.toggle('show',t==='scan');
   if(t==='order'){renderUnassignedPanel()}
@@ -498,11 +490,9 @@ function goTab(t){
   if(t==='load')renderLoad();
   refreshIcons();
 }
-
 document.getElementById('btn-undo').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!orderHistory.length)return;orderMap=orderHistory.pop();var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;save(currentKey+'_order',orderMap);refreshIcons();updHint();renderUnassignedPanel()};
 document.getElementById('btn-reset').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!confirm('순번을 모두 초기화할까요?'))return;orderHistory.push(JSON.parse(JSON.stringify(orderMap)));orderMap={};nextSeq=1;save(currentKey+'_order',orderMap);refreshIcons();updHint();renderUnassignedPanel()};
 document.getElementById('btn-save').onclick=function(){if(isLocked){alert('🔒 이미 확정된 순번입니다.');return}var n=Object.keys(orderMap).length;if(!n){alert('지정된 순번이 없습니다.');return}if(!confirm(n+'개 순번을 저장·확정합니다.\n저장 후 변경 불가합니다.\n계속할까요?'))return;isLocked=true;save(currentKey+'_order',orderMap);save(currentKey+'_locked',true);refreshIcons();updHint();alert('🔒 순번 확정!');goTab('map')};
-
 function renderLoad(){
   var assigned=D.filter(function(d){return orderMap[d.id]});
   var unassigned=D.filter(function(d){return !orderMap[d.id]});
@@ -527,18 +517,11 @@ function renderLoad(){
   document.getElementById('load-list').innerHTML=h;
 }
 window.setLoadSort=function(mode){loadSortMode=mode;renderLoad()};
-
 function showAddrModal(failed){
   failedAddrs=failed;
   var h='';
   failed.forEach(function(item,idx){
-    h+='<div class="addr-fix-item" id="af-'+idx+'">'
-      +'<div class="addr-fix-name">'+item.name+(item.product?' · '+item.product:'')+'</div>'
-      +'<div class="addr-fix-orig">원본: '+item.addr+'</div>'
-      +'<div class="addr-fix-row"><input class="addr-fix-input" type="text" id="af-input-'+idx+'" value="'+item.addr+'"><a class="addr-kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(item.addr)+'" target="_blank">🗺️</a></div>'
-      +'<button class="addr-confirm-btn" onclick="confirmAddr('+idx+')">✅ 이 주소로 핀 생성</button>'
-      +'<button class="addr-skip-btn" onclick="skipAddr('+idx+')">건너뛰기</button>'
-      +'</div>';
+    h+='<div class="addr-fix-item" id="af-'+idx+'"><div class="addr-fix-name">'+item.name+(item.product?' · '+item.product:'')+'</div><div class="addr-fix-orig">원본: '+item.addr+'</div><div class="addr-fix-row"><input class="addr-fix-input" type="text" id="af-input-'+idx+'" value="'+item.addr+'"><a class="addr-kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(item.addr)+'" target="_blank">🗺️</a></div><button class="addr-confirm-btn" onclick="confirmAddr('+idx+')">✅ 이 주소로 핀 생성</button><button class="addr-skip-btn" onclick="skipAddr('+idx+')">건너뛰기</button></div>';
   });
   document.getElementById('addr-fix-list').innerHTML=h;
   document.getElementById('addr-modal').classList.add('show');
@@ -554,7 +537,6 @@ window.confirmAddr=function(idx){
 };
 window.skipAddr=function(idx){var el=document.getElementById('af-'+idx);if(el)el.classList.add('fixed')};
 window.closeAddrModal=function(){document.getElementById('addr-modal').classList.remove('show')};
-
 document.getElementById('xl-input').addEventListener('change',function(e){
   var file=e.target.files[0];if(!file)return;
   var reader=new FileReader();
@@ -589,13 +571,11 @@ document.getElementById('xl-input').addEventListener('change',function(e){
   };
   reader.readAsBinaryString(file);e.target.value='';
 });
-
 async function loadMarkersWithFailCheck(items){
   var sb=document.getElementById('status');sb.style.display='block';
   var failed=[];
   for(var i=0;i<items.length;i++){
-    var d=items[i];
-    sb.textContent='주소 변환 중 '+(i+1)+'/'+items.length+' — '+d.name;
+    var d=items[i];sb.textContent='주소 변환 중 '+(i+1)+'/'+items.length+' — '+d.name;
     var c=await geocode(d.addr);
     if(c){putMarker(d,c)}else{failed.push(d)}
     await new Promise(function(r){setTimeout(r,80)});
@@ -606,7 +586,6 @@ async function loadMarkersWithFailCheck(items){
   goTab('map');
   if(failed.length>0)setTimeout(function(){showAddrModal(failed)},500);
 }
-
 function imgToBase64(file){return new Promise(function(res){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1])};r.readAsDataURL(file)})}
 async function scanWaybill(file){var base64=await imgToBase64(file);var mediaType=file.type||'image/jpeg';var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mediaType,data:base64}},{type:'text',text:'이 송장 이미지에서 배송 정보를 추출해주세요. 반드시 JSON 형식으로만 답하세요.\n{"name":"받는사람이름","addr":"받는사람전체주소","phone":"전화번호","tracking":"운송장번호","product":"품명","cashon":false,"cashamt":0}\n착불이면 cashon을 true로, 착불금액이 있으면 cashamt에 숫자로. 정보가 없는 항목은 빈 문자열로.'}]}]})});var data=await resp.json();return JSON.parse(data.content.map(function(i){return i.text||''}).join('').replace(/```json|```/g,'').trim())}
 function renderScanList(){
@@ -625,7 +604,7 @@ window.addScanItem=function(idx){
   var item=scanItems[idx];
   if(!item.addr){alert('주소를 입력해주세요!');return}
   if(!item.name){alert('이름을 입력해주세요!');return}
-  var seqInput=prompt('끼워넣을 순번을 입력하세요.\n(비우면 마지막 번호로 추가)','');
+  var seqInput=prompt('끼워넣을 순번을 입력하세요.\n(비우면 마지막)','');
   var d={id:uid(),name:item.name,addr:item.addr,phone:item.phone||'',product:item.product||'',tracking:item.tracking||'',qty:1,cashon:item.cashon||false,cashamt:item.cashamt||0};
   D.push(d);save(currentKey+'_data',D);
   if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}
