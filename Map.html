@@ -397,7 +397,7 @@ function onMarkerClick(d){
       Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});
       orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;
       save(currentKey+'_order',orderMap);
-      if(!markerMap[d.id])addMarkerForItem(d);
+      geocode(d.addr).then(function(c){if(c){putMarker(d,c)}});
       refreshIcons();updHint();renderUnassignedPanel();return;
     }
     map.closePopup();
@@ -438,14 +438,12 @@ function renderUnassignedPanel(){
   if(currentTab!=='order'){panel.classList.remove('show');return}
   panel.classList.add('show');
   if(!unassigned.length){
-    label.textContent='✅ 미지정 없음';
-    label.style.color='#22c55e';
+    label.textContent='✅ 미지정 없음';label.style.color='#22c55e';
     document.getElementById('unassigned-panel-body').innerHTML='<div style="padding:10px 16px;font-size:12px;color:#22c55e">모든 배송지 순번 지정 완료! 🎉</div>';
     return;
   }
-  label.textContent='⚠️ 미지정 '+unassigned.length+'건';
-  label.style.color='#f97316';
-  if(!panelOpen){return}
+  label.textContent='⚠️ 미지정 '+unassigned.length+'건';label.style.color='#f97316';
+  if(!panelOpen)return;
   var h='';
   unassigned.forEach(function(d){
     h+='<div class="unassigned-item">'
@@ -473,8 +471,13 @@ window.assignSeq=function(id){
   orderMap[id]=val;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;
   save(currentKey+'_order',orderMap);
   var d=D.find(function(x){return x.id===id});
-  if(d&&!markerMap[id])addMarkerForItem(d);
-  refreshIcons();updHint();renderUnassignedPanel();
+  if(d){
+    geocode(d.addr).then(function(c){
+      if(c){putMarker(d,c);refreshIcons()}
+      else{refreshIcons()}
+    });
+  }
+  updHint();renderUnassignedPanel();
   alert('✅ '+val+'번으로 지정됐어요!');
 };
 function goTab(t){
@@ -482,7 +485,6 @@ function goTab(t){
   ['map','order','load','scan'].forEach(function(id){var b=document.getElementById('tab-'+id);if(b)b.classList.toggle('active',id===t)});
   document.getElementById('order-bar').classList.toggle('show',t==='order');
   document.getElementById('order-badge').classList.toggle('show',t==='order');
-  // 지도는 load/scan 탭에서만 숨김
   document.getElementById('load-view').classList.toggle('show',t==='load');
   document.getElementById('scan-view').classList.toggle('show',t==='scan');
   if(t==='order'){renderUnassignedPanel()}
@@ -531,7 +533,7 @@ window.confirmAddr=function(idx){
   if(!newAddr)return;
   var item=failedAddrs[idx];
   var d=D.find(function(x){return x.id===item.id});
-  if(d){d.addr=newAddr;save(currentKey+'_data',D);addMarkerForItem(d)}
+  if(d){d.addr=newAddr;save(currentKey+'_data',D);geocode(newAddr).then(function(c){if(c)putMarker(d,c)})}
   var el=document.getElementById('af-'+idx);
   if(el){el.classList.add('fixed');el.querySelector('.addr-confirm-btn').textContent='✅ 생성 완료'}
 };
@@ -608,7 +610,9 @@ window.addScanItem=function(idx){
   var d={id:uid(),name:item.name,addr:item.addr,phone:item.phone||'',product:item.product||'',tracking:item.tracking||'',qty:1,cashon:item.cashon||false,cashamt:item.cashamt||0};
   D.push(d);save(currentKey+'_data',D);
   if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}
-  scanItems.splice(idx,1);renderScanList();addMarkerForItem(d);refreshIcons();updateCount();
+  scanItems.splice(idx,1);renderScanList();
+  geocode(d.addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}});
+  updateCount();
   alert('✅ '+d.name+' 추가됐어요!');
 };
 function handleImageFile(file){
@@ -632,7 +636,8 @@ window.addManual=function(){
   D.push(d);save(currentKey+'_data',D);
   if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}
   document.getElementById('m-name').value='';document.getElementById('m-addr').value='';document.getElementById('m-phone').value='';document.getElementById('m-tracking').value='';document.getElementById('m-product').value='';document.getElementById('m-cashamt').value='';document.getElementById('m-seq').value='';
-  addMarkerForItem(d);refreshIcons();updateCount();
+  geocode(addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}else{alert('⚠️ 주소를 찾지 못했어요.\n주소 확인: '+addr)}});
+  updateCount();
   alert('✅ '+d.name+' 추가됐어요!');
 };
 window.addReturn=function(){
@@ -646,11 +651,10 @@ window.addReturn=function(){
   var r={id:'r'+uid(),name:name,addr:addr,phone:phone,tracking:tracking,reason:reason};
   R.push(r);save(currentKey+'_ret',R);
   document.getElementById('r-name').value='';document.getElementById('r-addr').value='';document.getElementById('r-phone').value='';document.getElementById('r-tracking').value='';document.getElementById('r-reason').value='';
-  addRetMarkerForItem(r);updateCount();
+  geocode(addr).then(function(c){if(c)putRetMarker(r,c)});
+  updateCount();
   alert('↩ '+r.name+' 반품 등록됐어요!');
 };
-async function addMarkerForItem(d){var c=await geocode(d.addr);if(c){putMarker(d,c);map.setView([c.lat,c.lng],15)}else{alert('⚠️ 주소를 지도에서 찾지 못했어요.\n주소 확인: '+d.addr)}}
-async function addRetMarkerForItem(r){var c=await geocode(r.addr);if(c){putRetMarker(r,c);map.setView([c.lat,c.lng],15)}else{alert('⚠️ 주소를 지도에서 찾지 못했어요.\n주소 확인: '+r.addr)}}
 async function geocode(addr){
   if(coordCache[addr])return coordCache[addr];
   try{var res=await fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(addr),{headers:{'Authorization':'KakaoAK '+KK}});var j=await res.json();if(j.documents&&j.documents[0]){var c={lat:parseFloat(j.documents[0].y),lng:parseFloat(j.documents[0].x)};coordCache[addr]=c;save(currentKey+'_coords',coordCache);return c}}catch(e){}return null;
