@@ -48,7 +48,6 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 #header{position:fixed;top:0;left:0;right:0;height:48px;background:#0d1117;border-bottom:2px solid #22c55e;display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:9999}
 #header h1{font-size:14px;color:#22c55e;font-weight:800;cursor:pointer}
 #count{font-size:11px;color:#94a3b8}
-/* 지도는 항상 표시 */
 #map{position:fixed;top:48px;left:0;right:0;bottom:54px;z-index:1}
 #status{position:fixed;top:48px;left:0;right:0;background:rgba(0,0,0,0.85);color:#fff;font-size:11px;text-align:center;padding:4px;z-index:9000;display:none}
 #order-bar{position:fixed;top:48px;left:0;right:0;background:rgba(10,15,25,0.97);border-bottom:1px solid #2a2d3a;padding:8px 12px;display:none;gap:8px;align-items:center;flex-wrap:wrap;z-index:8999}
@@ -64,7 +63,6 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:#64748b;border:none;background:none;cursor:pointer}
 .tab-btn.active{color:#22c55e}
 .tab-btn .ico{font-size:18px}
-/* 미지정 패널 - 지도 위 하단에 뜸 */
 #unassigned-panel{position:fixed;left:0;right:0;bottom:54px;background:#0f1117;border-top:2px solid #f97316;z-index:500;display:none;flex-direction:column}
 #unassigned-panel.show{display:flex}
 #unassigned-panel-head{padding:8px 16px;background:#1a0e00;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -320,6 +318,18 @@ delCtrl.onAdd=function(){
 };
 delCtrl.addTo(map);
 
+// 같은 주소 핀 살짝 분산 (최대 8개)
+var OFFSETS=[
+  [0,0],[0.00008,0],[−0.00008,0],[0,0.00012],[0,−0.00012],
+  [0.00008,0.00012],[−0.00008,0.00012],[0.00008,−0.00012]
+];
+function getOffset(d){
+  var sameAddr=D.filter(function(x){return x.addr===d.addr});
+  var idx=sameAddr.findIndex(function(x){return x.id===d.id});
+  var off=OFFSETS[idx%OFFSETS.length]||[0,0];
+  return off;
+}
+
 function makeIcon(d){
   var isDone=doneMap[d.id],seq=orderMap[d.id],isOrd=currentTab==='order';
   var bg,label;
@@ -334,26 +344,19 @@ function makeRetIcon(r){
   var isDone=retDoneMap[r.id];
   return L.divIcon({className:'',html:'<div style="background:'+(isDone?'#22c55e':'#a78bfa')+';color:white;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)">'+(isDone?'✓':'↩')+'</div>',iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-20]});
 }
-function getGroupedByAddr(d){return D.filter(function(x){return x.addr===d.addr&&x.id!==d.id})}
 function makePopup(d){
   var isDone=doneMap[d.id],seq=orderMap[d.id];
-  var sameAddr=getGroupedByAddr(d);
-  var totalQty=d.qty||1;sameAddr.forEach(function(x){totalQty+=(x.qty||1)});
-  var qtyTag=totalQty>1?'<span class="qty-tag">📦 '+totalQty+'개</span>':'';
   var cashAmt=d.cashon?(d.cashamt?Number(d.cashamt).toLocaleString()+'원':'금액미상'):'';
   var cashTag=d.cashon?'<span class="cash-tag">💰 착불 '+cashAmt+'</span>':'';
   var smsMsg=encodeURIComponent('[천일택배] 안녕하세요, '+d.name+'님. 착불 '+cashAmt+' 준비 부탁드립니다.');
   var smsBtn=d.cashon&&d.phone?'<a class="sms-btn" href="sms:'+d.phone+'?body='+smsMsg+'">💬 착불 안내 문자 보내기</a>':'';
-  var trackings='<span class="track-tag">송장 '+String(d.tracking||'').slice(-4)+'</span>';
-  sameAddr.forEach(function(x){if(x.tracking)trackings+='<span class="track-tag">'+String(x.tracking).slice(-4)+'</span>'});
-  var products=d.product||'';
-  sameAddr.forEach(function(x){if(x.product&&x.product!==products)products+=(products?', ':'')+x.product});
+  var qtyTag=d.qty>1?'<span class="qty-tag">📦 '+d.qty+'개</span>':'';
   return '<div class="info-popup">'
     +'<div class="pnum '+(isDone?'':'undone')+'\">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'
     +'<div style="margin-bottom:6px">'+qtyTag+cashTag+'</div>'
     +'<div class="pname">'+d.name+'</div><div class="paddr">'+d.addr+'</div>'
-    +(products?'<div class="pprod">'+products+'</div>':'')
-    +'<div style="margin-bottom:6px">'+trackings+'</div>'
+    +(d.product?'<div class="pprod">'+d.product+'</div>':'')
+    +'<div style="margin-bottom:6px"><span class="track-tag">송장 '+String(d.tracking||'').slice(-4)+'</span></div>'
     +'<div class="pmeta">📞 '+(d.phone||'-')+'</div>'
     +'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'
     +smsBtn
@@ -373,7 +376,10 @@ function makeRetPopup(r){
 }
 function putMarker(d,coord){
   if(markerMap[d.id])map.removeLayer(markerMap[d.id]);
-  var m=L.marker([coord.lat,coord.lng],{icon:makeIcon(d)}).addTo(map);
+  var off=getOffset(d);
+  var lat=coord.lat+off[0];
+  var lng=coord.lng+off[1];
+  var m=L.marker([lat,lng],{icon:makeIcon(d)}).addTo(map);
   m.bindPopup(makePopup(d),{maxWidth:290});
   (function(dd){m.on('click',function(){onMarkerClick(dd)})})(d);
   markerMap[d.id]=m;
@@ -447,7 +453,7 @@ function renderUnassignedPanel(){
   var h='';
   unassigned.forEach(function(d){
     h+='<div class="unassigned-item">'
-      +'<div class="unassigned-info"><div class="unassigned-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+'</div><div class="unassigned-addr">'+d.addr+'</div></div>'
+      +'<div class="unassigned-info"><div class="unassigned-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+(d.qty>1?'<span class="badge qty">×'+d.qty+'</span>':'')+'</div><div class="unassigned-addr">'+d.addr+'</div></div>'
       +'<div class="unassigned-actions">'
       +'<a class="kakao-small" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️</a>'
       +'<input class="seq-input" type="number" placeholder="순번" id="seq-'+d.id+'">'
@@ -507,11 +513,10 @@ function renderLoad(){
     assigned.forEach(function(d,i){
       var delivSeq=orderMap[d.id],isDone=doneMap[d.id];
       var t4=String(d.tracking||'').slice(-4);
-      var totalQty=d.qty||1;getGroupedByAddr(d).forEach(function(x){totalQty+=(x.qty||1)});
       var loadNum=loadSortMode==='order'?(i+1):'';
       var numBg=loadSortMode==='order'&&i===0?'#facc15':'#2a2d3a';
       var numColor=loadSortMode==='order'&&i===0?'#1a1000':'#f1f5f9';
-      h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+numBg+';color:'+numColor+'">'+(loadSortMode==='tracking'?('<b style="font-size:15px;color:#facc15">'+t4+'</b>'):loadNum)+'</div><div class="load-info"><div class="load-name">'+d.name+(d.cashon?'<span class="badge cash">착불'+(d.cashamt?' '+Number(d.cashamt).toLocaleString()+'원':'')+'</span>':'')+(totalQty>1?'<span class="badge qty">×'+totalQty+'</span>':'')+'</div><div class="load-addr">'+d.addr+'</div>'+(d.product?'<div class="load-prod">'+d.product+'</div>':'')+'</div><div class="load-right"><div class="load-seq">배송<br><b>'+delivSeq+'번</b></div>'+(loadSortMode==='order'?'<div style="font-size:11px;color:#facc15;font-weight:700;margin-top:2px">'+t4+'</div>':'')+'</div></div>';
+      h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+numBg+';color:'+numColor+'">'+(loadSortMode==='tracking'?('<b style="font-size:15px;color:#facc15">'+t4+'</b>'):loadNum)+'</div><div class="load-info"><div class="load-name">'+d.name+(d.cashon?'<span class="badge cash">착불'+(d.cashamt?' '+Number(d.cashamt).toLocaleString()+'원':'')+'</span>':'')+(d.qty>1?'<span class="badge qty">×'+d.qty+'</span>':'')+'</div><div class="load-addr">'+d.addr+'</div>'+(d.product?'<div class="load-prod">'+d.product+'</div>':'')+'</div><div class="load-right"><div class="load-seq">배송<br><b>'+delivSeq+'번</b></div>'+(loadSortMode==='order'?'<div style="font-size:11px;color:#facc15;font-weight:700;margin-top:2px">'+t4+'</div>':'')+'</div></div>';
     });
     if(unassigned.length){h+='<div style="padding:8px 16px;font-size:11px;color:#f97316;background:#1a0e00;border-top:2px solid #f97316">⚠️ 순번 미지정 '+unassigned.length+'건</div>';unassigned.forEach(function(d){h+='<div class="load-item"><div class="load-num" style="background:#2a1a00;color:#f97316">?</div><div class="load-info"><div class="load-name">'+d.name+'</div><div class="load-addr">'+d.addr+'</div></div><div class="load-right"><div style="color:#f97316;font-size:11px">미지정</div></div></div>'})}
     if(R.length){h+='<div style="padding:8px 16px;font-size:11px;color:#a78bfa;background:#1a1030;border-top:2px solid #a78bfa">↩ 반품 수거 '+R.length+'건</div>';R.forEach(function(r){var isDone=retDoneMap[r.id];h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+(isDone?'#22c55e':'#7c3aed')+';color:white;border-radius:4px">↩</div><div class="load-info"><div class="load-name">'+r.name+'<span class="badge ret">반품</span></div><div class="load-addr">'+r.addr+'</div>'+(r.reason?'<div class="load-prod" style="color:#a78bfa">'+r.reason+'</div>':'')+'</div><div class="load-right"><div style="font-size:10px;color:#64748b">'+(r.tracking?String(r.tracking).slice(-4):'')+'</div></div></div>'})}
@@ -612,8 +617,7 @@ window.addScanItem=function(idx){
   if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}
   scanItems.splice(idx,1);renderScanList();
   geocode(d.addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}});
-  updateCount();
-  alert('✅ '+d.name+' 추가됐어요!');
+  updateCount();alert('✅ '+d.name+' 추가됐어요!');
 };
 function handleImageFile(file){
   if(!file)return;
@@ -636,9 +640,8 @@ window.addManual=function(){
   D.push(d);save(currentKey+'_data',D);
   if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}
   document.getElementById('m-name').value='';document.getElementById('m-addr').value='';document.getElementById('m-phone').value='';document.getElementById('m-tracking').value='';document.getElementById('m-product').value='';document.getElementById('m-cashamt').value='';document.getElementById('m-seq').value='';
-  geocode(addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}else{alert('⚠️ 주소를 찾지 못했어요.\n주소 확인: '+addr)}});
-  updateCount();
-  alert('✅ '+d.name+' 추가됐어요!');
+  geocode(addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}else{alert('⚠️ 주소를 찾지 못했어요.')}});
+  updateCount();alert('✅ '+d.name+' 추가됐어요!');
 };
 window.addReturn=function(){
   var name=document.getElementById('r-name').value.trim();
@@ -652,8 +655,7 @@ window.addReturn=function(){
   R.push(r);save(currentKey+'_ret',R);
   document.getElementById('r-name').value='';document.getElementById('r-addr').value='';document.getElementById('r-phone').value='';document.getElementById('r-tracking').value='';document.getElementById('r-reason').value='';
   geocode(addr).then(function(c){if(c)putRetMarker(r,c)});
-  updateCount();
-  alert('↩ '+r.name+' 반품 등록됐어요!');
+  updateCount();alert('↩ '+r.name+' 반품 등록됐어요!');
 };
 async function geocode(addr){
   if(coordCache[addr])return coordCache[addr];
