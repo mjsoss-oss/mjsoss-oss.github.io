@@ -238,7 +238,6 @@ function uid(){return 'd'+Date.now()+Math.random().toString(36).slice(2,6)}
 function getSessions(){return load(KEY_SESSIONS,[])}
 function saveSessions(s){save(KEY_SESSIONS,s)}
 
-// localStorage에서 ss_dlv_ 키 자동 복원
 function recoverSessions(){
   var sessions=getSessions();
   var existingKeys=sessions.map(function(s){return s.key});
@@ -261,10 +260,7 @@ function recoverSessions(){
       }
     }
   }
-  if(recovered){
-    sessions.sort(function(a,b){return b.created-a.created});
-    saveSessions(sessions);
-  }
+  if(recovered){sessions.sort(function(a,b){return b.created-a.created});saveSessions(sessions)}
   return sessions;
 }
 
@@ -345,8 +341,10 @@ delCtrl.onAdd=function(){
   return div;
 };
 delCtrl.addTo(map);
+
 var OFFSETS=[[0,0],[0.00008,0],[-0.00008,0],[0,0.00012],[0,-0.00012],[0.00008,0.00012],[-0.00008,0.00012],[0.00008,-0.00012]];
-function getOffset(d){var sameAddr=D.filter(function(x){return x.addr===d.addr});var idx=sameAddr.findIndex(function(x){return x.id===d.id});var off=OFFSETS[idx%OFFSETS.length]||[0,0];return off}
+function getOffset(d){var sameAddr=D.filter(function(x){return x.addr===d.addr});var idx=sameAddr.findIndex(function(x){return x.id===d.id});return OFFSETS[idx%OFFSETS.length]||[0,0]}
+
 function makeIcon(d){
   var isDone=doneMap[d.id],seq=orderMap[d.id],isOrd=currentTab==='order';
   var bg,label;
@@ -358,6 +356,7 @@ function makeIcon(d){
   return L.divIcon({className:'',html:'<div style="background:'+bg+';color:white;border-radius:50%;width:'+size+'px;height:'+size+'px;display:flex;align-items:center;justify-content:center;font-size:'+fs+';font-weight:900;border:'+border+';box-shadow:0 2px 6px rgba(0,0,0,0.4)">'+label+'</div>',iconSize:[size,size],iconAnchor:[size/2,size/2],popupAnchor:[0,-size/2-4]});
 }
 function makeRetIcon(r){var isDone=retDoneMap[r.id];return L.divIcon({className:'',html:'<div style="background:'+(isDone?'#22c55e':'#a78bfa')+';color:white;border-radius:4px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4)">'+(isDone?'✓':'↩')+'</div>',iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-20]})}
+
 function makePopup(d){
   var isDone=doneMap[d.id],seq=orderMap[d.id];
   var cashAmt=d.cashon?(d.cashamt?Number(d.cashamt).toLocaleString()+'원':'금액미상'):'';
@@ -365,9 +364,20 @@ function makePopup(d){
   var smsMsg=encodeURIComponent('[천일택배] 안녕하세요, '+d.name+'님. 착불 '+cashAmt+' 준비 부탁드립니다.');
   var smsBtn=d.cashon&&d.phone?'<a class="sms-btn" href="sms:'+d.phone+'?body='+smsMsg+'">💬 착불 안내 문자 보내기</a>':'';
   var qtyTag=d.qty>1?'<span class="qty-tag">📦 '+d.qty+'개</span>':'';
-  return '<div class="info-popup">'+'<div class="pnum '+(isDone?'':'undone')+'\">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'+'<div style="margin-bottom:6px">'+qtyTag+cashTag+'</div>'+'<div class="pname">'+d.name+'</div><div class="paddr">'+d.addr+'</div>'+(d.product?'<div class="pprod">'+d.product+'</div>':'')+'<div style="margin-bottom:6px"><span class="track-tag">송장 '+String(d.tracking||'').slice(-4)+'</span></div>'+'<div class="pmeta">📞 '+(d.phone||'-')+'</div>'+'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'+smsBtn+'<button class="done-btn '+(isDone?'undo':'')+'\" onclick="toggleDone(\''+d.id+'\')">'+(isDone?'↩ 완료 취소':'✅ 배송 완료')+'</button></div>';
+  return '<div class="info-popup">'
+    +'<div class="pnum '+(isDone?'':'undone')+'\">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'
+    +'<div style="margin-bottom:6px">'+qtyTag+cashTag+'</div>'
+    +'<div class="pname">'+d.name+'</div><div class="paddr">'+d.addr+'</div>'
+    +(d.product?'<div class="pprod">'+d.product+'</div>':'')
+    +'<div style="margin-bottom:6px"><span class="track-tag">송장 '+String(d.tracking||'').slice(-4)+'</span></div>'
+    +'<div class="pmeta">📞 '+(d.phone||'-')+'</div>'
+    +'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'
+    +smsBtn
+    +'<button class="done-btn '+(isDone?'undo':'')+'\" onclick="toggleDone(\''+d.id+'\')">'+(isDone?'↩ 완료 취소':'✅ 배송 완료')+'</button>'
+    +'</div>';
 }
 function makeRetPopup(r){var isDone=retDoneMap[r.id];return '<div class="info-popup">'+'<div class="pnum '+(isDone?'retdone':'ret')+'">↩ '+(isDone?'수거 완료':'반품 수거')+'</div>'+'<div class="pname">'+r.name+'</div><div class="paddr">'+r.addr+'</div>'+(r.reason?'<div class="pret">사유: '+r.reason+'</div>':'')+'<div class="pmeta">📞 '+(r.phone||'-')+(r.tracking?' · 송장 <b>'+String(r.tracking).slice(-4)+'</b>':'')+'</div>'+'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(r.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'+'<button class="done-btn ret '+(isDone?'undo':'')+'\" onclick="toggleRetDone(\''+r.id+'\')">'+(isDone?'↩ 수거 취소':'✅ 반품 수거 완료')+'</button></div>'}
+
 function putMarker(d,coord){
   if(markerMap[d.id])map.removeLayer(markerMap[d.id]);
   var off=getOffset(d);
@@ -460,6 +470,7 @@ function showAddrModal(failed){
 window.confirmAddr=function(idx){var newAddr=document.getElementById('af-input-'+idx).value.trim();if(!newAddr)return;var item=failedAddrs[idx];var d=D.find(function(x){return x.id===item.id});if(d){d.addr=newAddr;save(currentKey+'_data',D);geocode(newAddr).then(function(c){if(c)putMarker(d,c)})}var el=document.getElementById('af-'+idx);if(el){el.classList.add('fixed');el.querySelector('.addr-confirm-btn').textContent='✅ 생성 완료'}};
 window.skipAddr=function(idx){var el=document.getElementById('af-'+idx);if(el)el.classList.add('fixed')};
 window.closeAddrModal=function(){document.getElementById('addr-modal').classList.remove('show')};
+
 document.getElementById('xl-input').addEventListener('change',function(e){
   var file=e.target.files[0];if(!file)return;
   var reader=new FileReader();
@@ -474,7 +485,7 @@ document.getElementById('xl-input').addEventListener('change',function(e){
       var hs=rows[hr].map(function(h){return cs(h)});
       function gi(){for(var ni=0;ni<arguments.length;ni++){for(var hi=0;hi<hs.length;hi++){if(hs[hi].indexOf(arguments[ni])>=0)return hi}}return -1}
       var iN=gi('받는사람'),iA=gi('주소','받는사람주소'),iP=gi('도착전화번호','배송전화번호','받는사람전화');
-      var iPr=gi('상품명','품명'),iPr2=gi('등록품명'),iT=gi('운송장번호','운송장','송장'),iQ=gi('수량'),iCA=gi('현/착','구분'),iAmt=gi('착불금액','도선료','금액');
+      var iPr=gi('상품명','품명'),iPr2=gi('등록품명'),iT=gi('운송장번호','운송장','송장'),iQ=gi('수량'),iCA=gi('현/착','구분'),iAmt=gi('착불금액','도선료','총운임','금액');
       var nd=[];
       for(var ri=hr+1;ri<rows.length;ri++){
         var row=rows[ri];if(!row||!Array.isArray(row))continue;
@@ -482,8 +493,9 @@ document.getElementById('xl-input').addEventListener('change',function(e){
         var name=iN>=0?(cs(row[iN])||'이름없음'):'이름없음';
         var product='';if(iPr>=0)product=cs(row[iPr]);if(!product&&iPr2>=0)product=cs(row[iPr2]);
         var cashStr=iCA>=0?cs(row[iCA]):'';
-        var cashAmt=iAmt>=0?Number(cs(row[iAmt]).replace(/[^0-9]/g,''))||0:0;
-        nd.push({id:uid(),name:name,addr:addr,phone:iP>=0?cs(row[iP]):'',product:product,tracking:iT>=0?cs(row[iT]):'',qty:iQ>=0?(Number(row[iQ])||1):1,cashon:cashStr==='착불',cashamt:cashAmt});
+        var isCash=cashStr==='착불';
+        var cashAmt=isCash&&iAmt>=0?Number(cs(row[iAmt]).replace(/[^0-9]/g,''))||0:0;
+        nd.push({id:uid(),name:name,addr:addr,phone:iP>=0?cs(row[iP]):'',product:product,tracking:iT>=0?cs(row[iT]):'',qty:iQ>=0?(Number(row[iQ])||1):1,cashon:isCash,cashamt:cashAmt});
       }
       if(!nd.length){alert('데이터를 찾을 수 없어요.');return}
       if(!confirm('엑셀 '+nd.length+'건을 추가할까요?'))return;
@@ -493,6 +505,7 @@ document.getElementById('xl-input').addEventListener('change',function(e){
   };
   reader.readAsBinaryString(file);e.target.value='';
 });
+
 async function loadMarkersWithFailCheck(items){
   var sb=document.getElementById('status');sb.style.display='block';var failed=[];
   for(var i=0;i<items.length;i++){var d=items[i];sb.textContent='주소 변환 중 '+(i+1)+'/'+items.length+' — '+d.name;var c=await geocode(d.addr);if(c){putMarker(d,c)}else{failed.push(d)}await new Promise(function(r){setTimeout(r,80)})}
