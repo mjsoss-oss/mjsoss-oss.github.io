@@ -38,7 +38,7 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
 .addr-fix-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
 .addr-fix-input{flex:1;background:#0f1117;border:1px solid #2a2d3a;border-radius:6px;padding:7px 10px;color:#f1f5f9;font-size:12px;font-family:inherit}
 .addr-fix-input:focus{outline:none;border-color:#22c55e}
-.addr-kakao-btn{padding:7px 10px;background:#FFCD00;color:#3C1E1E;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
+.addr-kakao-btn{padding:7px 10px;background:#FFCD00;color:#3C1E1E;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
 .addr-confirm-btn{width:100%;padding:9px;background:#22c55e;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
 .addr-skip-btn{width:100%;padding:7px;background:#1e2030;color:#94a3b8;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;margin-top:4px}
 .addr-modal-footer{position:sticky;bottom:0;background:#0f1117;padding:12px 0 4px;border-top:1px solid #2a2d3a;margin-top:8px}
@@ -461,12 +461,33 @@ function renderLoad(){
   document.getElementById('load-list').innerHTML=h;
 }
 window.setLoadSort=function(mode){loadSortMode=mode;renderLoad()};
+
+// ★ 핵심 수정: 카카오맵 버튼이 현재 input 값을 읽어서 열리도록
 function showAddrModal(failed){
   failedAddrs=failed;var h='';
-  failed.forEach(function(item,idx){h+='<div class="addr-fix-item" id="af-'+idx+'"><div class="addr-fix-name">'+item.name+(item.product?' · '+item.product:'')+'</div><div class="addr-fix-orig">원본: '+item.addr+'</div><div class="addr-fix-row"><input class="addr-fix-input" type="text" id="af-input-'+idx+'" value="'+item.addr+'"><a class="addr-kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(item.addr)+'" target="_blank">🗺️</a></div><button class="addr-confirm-btn" onclick="confirmAddr('+idx+')">✅ 이 주소로 핀 생성</button><button class="addr-skip-btn" onclick="skipAddr('+idx+')">건너뛰기</button></div>'});
+  failed.forEach(function(item,idx){
+    h+='<div class="addr-fix-item" id="af-'+idx+'">'
+      +'<div class="addr-fix-name">'+item.name+(item.product?' · '+item.product:'')+'</div>'
+      +'<div class="addr-fix-orig">원본: '+item.addr+'</div>'
+      +'<div class="addr-fix-row">'
+      +'<input class="addr-fix-input" type="text" id="af-input-'+idx+'" value="'+item.addr+'">'
+      +'<button class="addr-kakao-btn" onclick="openKakaoWithInput('+idx+')">🗺️</button>'
+      +'</div>'
+      +'<button class="addr-confirm-btn" onclick="confirmAddr('+idx+')">✅ 이 주소로 핀 생성</button>'
+      +'<button class="addr-skip-btn" onclick="skipAddr('+idx+')">건너뛰기</button>'
+      +'</div>';
+  });
   document.getElementById('addr-fix-list').innerHTML=h;
   document.getElementById('addr-modal').classList.add('show');
 }
+
+// ★ input 현재값으로 카카오맵 열기
+window.openKakaoWithInput=function(idx){
+  var val=document.getElementById('af-input-'+idx).value.trim();
+  if(!val){alert('주소를 입력해주세요!');return}
+  window.open('https://map.kakao.com/?q='+encodeURIComponent(val),'_blank');
+};
+
 window.confirmAddr=function(idx){var newAddr=document.getElementById('af-input-'+idx).value.trim();if(!newAddr)return;var item=failedAddrs[idx];var d=D.find(function(x){return x.id===item.id});if(d){d.addr=newAddr;save(currentKey+'_data',D);geocode(newAddr).then(function(c){if(c)putMarker(d,c)})}var el=document.getElementById('af-'+idx);if(el){el.classList.add('fixed');el.querySelector('.addr-confirm-btn').textContent='✅ 생성 완료'}};
 window.skipAddr=function(idx){var el=document.getElementById('af-'+idx);if(el)el.classList.add('fixed')};
 window.closeAddrModal=function(){document.getElementById('addr-modal').classList.remove('show')};
