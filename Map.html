@@ -369,7 +369,18 @@ delCtrl.onAdd=function(){
 delCtrl.addTo(map);
 
 var OFFSETS=[[0,0],[0.00008,0],[-0.00008,0],[0,0.00012],[0,-0.00012],[0.00008,0.00012],[-0.00008,0.00012],[0.00008,-0.00012]];
-function getOffset(d){var sameAddr=D.filter(function(x){return x.addr===d.addr});var idx=sameAddr.findIndex(function(x){return x.id===d.id});return OFFSETS[idx%OFFSETS.length]||[0,0]}
+
+// ★ 핵심 수정: 주소 문자열이 아닌 실제 좌표 기준으로 offset 계산
+function getOffsetByCoord(d){
+  var myCoord=coordCache[d.addr];
+  if(!myCoord)return[0,0];
+  var sameCoord=D.filter(function(x){
+    var c=coordCache[x.addr];
+    return c&&Math.abs(c.lat-myCoord.lat)<0.00001&&Math.abs(c.lng-myCoord.lng)<0.00001;
+  });
+  var idx=sameCoord.findIndex(function(x){return x.id===d.id});
+  return OFFSETS[idx%OFFSETS.length]||[0,0];
+}
 
 function makeIcon(d){
   var isDone=doneMap[d.id],seq=orderMap[d.id],isOrd=currentTab==='order';
@@ -402,11 +413,11 @@ function makePopup(d){
     +'<button class="done-btn '+(isDone?'undo':'')+'\" onclick="toggleDone(\''+d.id+'\')">'+(isDone?'↩ 완료 취소':'✅ 배송 완료')+'</button>'
     +'</div>';
 }
-function makeRetPopup(r){var isDone=retDoneMap[r.id];return '<div class="info-popup">'+'<div class="pnum '+(isDone?'retdone':'ret')+'">↩ '+(isDone?'수거 완료':'반품 수거')+'</div>'+'<div class="pname">'+r.name+'</div><div class="paddr">'+r.addr+'</div>'+(r.reason?'<div class="pret">사유: '+r.reason+'</div>':'')+'<div class="pmeta">📞 '+(r.phone||'-')+(r.tracking?' · 송장 '+String(r.tracking).slice(-4):'')+'</div>'+'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(r.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'+'<button class="done-btn ret '+(isDone?'undo':'')+'\" onclick="toggleRetDone(\''+r.id+'\')">'+(isDone?'↩ 수거 취소':'✅ 반품 수거 완료')+'</button></div>'}
+function makeRetPopup(r){var isDone=retDoneMap[r.id];return '<div class="info-popup">'+'<div class="pnum '+(isDone?'retdone':'ret')+'">↩ '+(isDone?'수거 완료':'반품 수거')+'</div>'+'<div class="pname">'+r.name+'</div><div class="paddr">'+r.addr+'</div>'+(r.reason?'<div class="pret">사유: '+r.reason+'</div>':'')+'<div class="pmeta">📞 '+(r.phone||'-')+(r.tracking?' · 송장 '+String(r.tracking).slice(-4):'')+'</div>'+'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(r.addr)+'" target="_blank">🗺️  카카오맵으로 보기</a>'+'<button class="done-btn ret '+(isDone?'undo':'')+'\" onclick="toggleRetDone(\''+r.id+'\')">'+(isDone?'↩ 수거 취소':'✅ 반품 수거 완료')+'</button></div>'}
 
 function putMarker(d,coord){
   if(markerMap[d.id])map.removeLayer(markerMap[d.id]);
-  var off=getOffset(d);
+  var off=getOffsetByCoord(d);
   var m=L.marker([coord.lat+off[0],coord.lng+off[1]],{icon:makeIcon(d)}).addTo(map);
   m.bindPopup(makePopup(d),{maxWidth:290});
   (function(dd){m.on('click',function(){onMarkerClick(dd)})})(d);
@@ -450,7 +461,6 @@ function renderUnassignedPanel(){
 }
 window.togglePanel=function(){var body=document.getElementById('unassigned-panel-body');var btn=document.getElementById('panel-toggle-btn');if(panelOpen){body.style.display='none';btn.textContent='▼ 펼치기';panelOpen=false}else{body.style.display='';btn.textContent='▲ 접기';panelOpen=true;renderUnassignedPanel()}};
 
-// ★ 핵심 수정: 이미 핀 있으면 putMarker 생략, 아이콘·팝업만 갱신
 window.assignSeq=function(id){
   var input=document.getElementById('seq-'+id);var val=Number(input.value);
   if(!val||isNaN(val)){alert('순번을 입력해주세요!');return}
@@ -461,12 +471,10 @@ window.assignSeq=function(id){
   var d=D.find(function(x){return x.id===id});
   if(d){
     if(markerMap[d.id]){
-      // 핀 이미 있으면 위치 그대로, 아이콘·팝업만 갱신
       markerMap[d.id].setIcon(makeIcon(d));
       markerMap[d.id].setPopupContent(makePopup(d));
       refreshIcons();
     }else{
-      // 핀 없을 때만 새로 생성
       geocode(d.addr).then(function(c){if(c){putMarker(d,c)}refreshIcons()});
     }
   }
