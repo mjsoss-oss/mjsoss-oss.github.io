@@ -368,17 +368,25 @@ delCtrl.onAdd=function(){
 };
 delCtrl.addTo(map);
 
-var OFFSETS=[[0,0],[0.00008,0],[-0.00008,0],[0,0.00012],[0,-0.00012],[0.00008,0.00012],[-0.00008,0.00012],[0.00008,-0.00012]];
+var OFFSETS=[[0,0],[0.00010,0],[-0.00010,0],[0,0.00013],[0,-0.00013],[0.00010,0.00013],[-0.00010,0.00013],[0.00010,-0.00013]];
 
-// ★ 핵심 수정: 주소 문자열이 아닌 실제 좌표 기준으로 offset 계산
-function getOffsetByCoord(d){
+// ★ 핵심 수정: coordCache 전체를 순회해 실제 좌표값이 같은 것들끼리 묶어서 offset 적용
+function getSameCoordItems(d){
   var myCoord=coordCache[d.addr];
-  if(!myCoord)return[0,0];
-  var sameCoord=D.filter(function(x){
-    var c=coordCache[x.addr];
-    return c&&Math.abs(c.lat-myCoord.lat)<0.00001&&Math.abs(c.lng-myCoord.lng)<0.00001;
+  if(!myCoord)return[d];
+  // coordCache에서 같은 좌표를 가진 주소 키들 수집
+  var sameAddrKeys=Object.keys(coordCache).filter(function(k){
+    var c=coordCache[k];
+    return Math.abs(c.lat-myCoord.lat)<0.00002&&Math.abs(c.lng-myCoord.lng)<0.00002;
   });
-  var idx=sameCoord.findIndex(function(x){return x.id===d.id});
+  // 그 주소 키들에 해당하는 D 항목들 수집 (D에 등록된 순서 유지)
+  return D.filter(function(x){return sameAddrKeys.indexOf(x.addr)>=0});
+}
+
+function getOffsetByCoord(d){
+  var items=getSameCoordItems(d);
+  var idx=items.findIndex(function(x){return x.id===d.id});
+  if(idx<0)return[0,0];
   return OFFSETS[idx%OFFSETS.length]||[0,0];
 }
 
@@ -413,7 +421,7 @@ function makePopup(d){
     +'<button class="done-btn '+(isDone?'undo':'')+'\" onclick="toggleDone(\''+d.id+'\')">'+(isDone?'↩ 완료 취소':'✅ 배송 완료')+'</button>'
     +'</div>';
 }
-function makeRetPopup(r){var isDone=retDoneMap[r.id];return '<div class="info-popup">'+'<div class="pnum '+(isDone?'retdone':'ret')+'">↩ '+(isDone?'수거 완료':'반품 수거')+'</div>'+'<div class="pname">'+r.name+'</div><div class="paddr">'+r.addr+'</div>'+(r.reason?'<div class="pret">사유: '+r.reason+'</div>':'')+'<div class="pmeta">📞 '+(r.phone||'-')+(r.tracking?' · 송장 '+String(r.tracking).slice(-4):'')+'</div>'+'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(r.addr)+'" target="_blank">🗺️  카카오맵으로 보기</a>'+'<button class="done-btn ret '+(isDone?'undo':'')+'\" onclick="toggleRetDone(\''+r.id+'\')">'+(isDone?'↩ 수거 취소':'✅ 반품 수거 완료')+'</button></div>'}
+function makeRetPopup(r){var isDone=retDoneMap[r.id];return '<div class="info-popup">'+'<div class="pnum '+(isDone?'retdone':'ret')+'">↩ '+(isDone?'수거 완료':'반품 수거')+'</div>'+'<div class="pname">'+r.name+'</div><div class="paddr">'+r.addr+'</div>'+(r.reason?'<div class="pret">사유: '+r.reason+'</div>':'')+'<div class="pmeta">📞 '+(r.phone||'-')+(r.tracking?' · 송장 '+String(r.tracking).slice(-4):'')+'</div>'+'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(r.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'+'<button class="done-btn ret '+(isDone?'undo':'')+'\" onclick="toggleRetDone(\''+r.id+'\')">'+(isDone?'↩ 수거 취소':'✅ 반품 수거 완료')+'</button></div>'}
 
 function putMarker(d,coord){
   if(markerMap[d.id])map.removeLayer(markerMap[d.id]);
