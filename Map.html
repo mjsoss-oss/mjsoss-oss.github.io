@@ -163,9 +163,9 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
   <button class="new-delivery-btn" onclick="createNewDelivery()">➕ 새 배송 만들기</button>
   <div class="delivery-list" id="delivery-list"></div>
   <div style="padding:16px 20px 24px;text-align:center;font-size:11px;color:#475569;line-height:1.8;border-top:1px solid #1e2130;margin-top:8px">
-  상호: 오예스 화물 &nbsp;|&nbsp; 대표자: 오신성 &nbsp;|&nbsp; 사업자등록번호: 113-65-00760<br>
-  사업장 주소: 서울특별시 서대문구 신촌로3나길 15-4, 402호(창천동)
-</div>
+    상호: 오예스 화물 &nbsp;|&nbsp; 대표자: 오신성 &nbsp;|&nbsp; 사업자등록번호: 113-65-00760<br>
+    사업장 주소: 서울특별시 서대문구 신촌로3나길 15-4, 402호(창천동)
+  </div>
 </div>
 <div id="addr-modal">
   <div id="addr-modal-inner">
@@ -233,6 +233,10 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
       <div class="manual-field"><label>반품 사유</label><input type="text" id="r-reason" placeholder="수취거부 / 주소오류 / 고객요청 등"></div>
       <button class="ret-add-btn" onclick="addReturn()">↩ 반품 등록</button>
     </div>
+    <div class="section-divider">
+      <div class="section-label">🔗 이전 배송 합치기</div>
+      <button class="manual-add-btn" style="background:#0e7490" onclick="openMergeModal()">🔗 이전 미배송건 가져오기</button>
+    </div>
   </div>
   <div id="footer">
     <button class="tab-btn active" id="tab-map" onclick="goTab('map')"><span class="ico">🗺️</span>지도</button>
@@ -240,7 +244,16 @@ html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'A
     <button class="tab-btn" id="tab-load" onclick="goTab('load')"><span class="ico">📦</span>적재</button>
     <button class="tab-btn" id="tab-scan" onclick="goTab('scan')"><span class="ico">📷</span>추가</button>
   </div>
-</div><script>
+</div>
+<div id="merge-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:99997;display:none;flex-direction:column">
+  <div style="background:#0f1117;width:100%;max-height:80vh;border-radius:20px 20px 0 0;position:fixed;bottom:0;left:0;right:0;overflow-y:auto;padding:20px 16px 30px">
+    <div style="font-size:15px;font-weight:800;color:#22d3ee;margin-bottom:4px">🔗 이전 배송 합치기</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:14px">다른 배송의 미배송 건을 오늘 배송에 가져옵니다. 원래 순번은 비어있으면 그대로 유지돼요.</div>
+    <div id="merge-list"></div>
+    <button onclick="closeMergeModal()" style="width:100%;padding:13px;background:#475569;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;margin-top:6px;cursor:pointer">닫기</button>
+  </div>
+</div>
+<script>
 var KK='11a04ee8514fc04d127e70fd3efd9fe0';
 var KEY_SESSIONS='ss_sessions_v2';
 var currentKey=null;
@@ -374,16 +387,13 @@ delCtrl.addTo(map);
 
 var OFFSETS=[[0,0],[0.00010,0],[-0.00010,0],[0,0.00013],[0,-0.00013],[0.00010,0.00013],[-0.00010,0.00013],[0.00010,-0.00013]];
 
-// ★ 핵심 수정: coordCache 전체를 순회해 실제 좌표값이 같은 것들끼리 묶어서 offset 적용
 function getSameCoordItems(d){
   var myCoord=coordCache[d.addr];
   if(!myCoord)return[d];
-  // coordCache에서 같은 좌표를 가진 주소 키들 수집
   var sameAddrKeys=Object.keys(coordCache).filter(function(k){
     var c=coordCache[k];
     return Math.abs(c.lat-myCoord.lat)<0.00002&&Math.abs(c.lng-myCoord.lng)<0.00002;
   });
-  // 그 주소 키들에 해당하는 D 항목들 수집 (D에 등록된 순서 유지)
   return D.filter(function(x){return sameAddrKeys.indexOf(x.addr)>=0});
 }
 
@@ -399,6 +409,7 @@ function makeIcon(d){
   var bg,label;
   if(isOrd){bg=seq?'#f97316':'#6b7280';label=seq?String(seq):'·'}
   else{bg=isDone?'#22c55e':(seq?'#ef4444':'#6b7280');label=isDone?'✓':(seq?String(seq):'·')}
+  if(d.carried&&!isDone)bg='#06b6d4';
   var fs=String(label).length>3?'7px':String(label).length>2?'9px':'11px';
   var size=isOrd?34:(seq?34:22);
   var border=d.cashon?'3px solid #f97316':'2px solid white';
@@ -413,9 +424,10 @@ function makePopup(d){
   var smsMsg=encodeURIComponent('안녕하세요, 천일택배입니다. '+d.product+' 배송 완료하였습니다. 착불 '+cashAmt+' 계좌이체 부탁드립니다.\n신한은행 133000213949 오신성\n감사합니다 😊');
   var smsBtn=d.cashon&&d.phone?'<a class="sms-btn" href="sms:'+d.phone+'?body='+smsMsg+'">💬 착불 문자 보내기</a>':'';
   var qtyTag=d.qty>1?'<span class="qty-tag">📦 '+d.qty+'개</span>':'';
+  var carriedTag=d.carried?'<span class="track-tag" style="background:#0e7490;color:#a5f3fc">🔗 인계'+(d.carriedSeq?' (원순번 '+d.carriedSeq+'번)':'')+'</span>':'';
   return '<div class="info-popup">'
     +'<div class="pnum '+(isDone?'':'undone')+'\">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'
-    +'<div style="margin-bottom:6px">'+qtyTag+cashTag+'</div>'
+    +'<div style="margin-bottom:6px">'+qtyTag+cashTag+carriedTag+'</div>'
     +'<div class="pname">'+d.name+'</div><div class="paddr">'+d.addr+'</div>'
     +(d.product?'<div class="pprod">'+d.product+'</div>':'')
     +'<div style="margin-bottom:6px"><span class="track-tag">송장 '+String(d.tracking||'').slice(-4)+'</span></div>'
@@ -468,7 +480,7 @@ function renderUnassignedPanel(){
   label.textContent='⚠️ 미지정 '+unassigned.length+'건';label.style.color='#f97316';
   if(!panelOpen)return;
   var h='';
-  unassigned.forEach(function(d){h+='<div class="unassigned-item"><div class="unassigned-info"><div class="unassigned-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+'</div><div class="unassigned-addr">'+d.addr+'</div></div><div class="unassigned-actions"><a class="kakao-small" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️</a><input class="seq-input" type="number" placeholder="순번" id="seq-'+d.id+'"><button class="seq-assign-btn" onclick="assignSeq(\''+d.id+'\')">지정</button></div></div>'});
+  unassigned.forEach(function(d){h+='<div class="unassigned-item"><div class="unassigned-info"><div class="unassigned-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+(d.carried?'<span class="badge" style="background:#0e3a44;color:#67e8f9">인계</span>':'')+'</div><div class="unassigned-addr">'+d.addr+'</div></div><div class="unassigned-actions"><a class="kakao-small" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️</a><input class="seq-input" type="number" placeholder="순번" id="seq-'+d.id+'"><button class="seq-assign-btn" onclick="assignSeq(\''+d.id+'\')">지정</button></div></div>'});
   document.getElementById('unassigned-panel-body').innerHTML=h;
 }
 window.togglePanel=function(){var body=document.getElementById('unassigned-panel-body');var btn=document.getElementById('panel-toggle-btn');if(panelOpen){body.style.display='none';btn.textContent='▼ 펼치기';panelOpen=false}else{body.style.display='';btn.textContent='▲ 접기';panelOpen=true;renderUnassignedPanel()}};
@@ -518,8 +530,8 @@ function renderLoad(){
   if(!assigned.length){h='<div style="padding:40px;text-align:center;color:#64748b">순번 지정 후 저장해주세요.</div>'}
   else{
     h+='<div style="padding:8px 12px;background:#0a0c10;border-bottom:1px solid #1e2130;display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;color:#64748b">총 '+assigned.length+'개</span><div style="display:flex;gap:6px"><button onclick="setLoadSort(\'tracking\')" style="padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:'+(loadSortMode==='tracking'?'#facc15':'#2a2d3a')+';color:'+(loadSortMode==='tracking'?'#1a1000':'#94a3b8')+'">송장번호순</button><button onclick="setLoadSort(\'order\')" style="padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:'+(loadSortMode==='order'?'#22c55e':'#2a2d3a')+';color:'+(loadSortMode==='order'?'white':'#94a3b8')+'">적재순서</button></div></div>';
-    assigned.forEach(function(d,i){var delivSeq=orderMap[d.id],isDone=doneMap[d.id];var t4=String(d.tracking||'').slice(-4);var loadNum=loadSortMode==='order'?(i+1):'';var numBg=loadSortMode==='order'&&i===0?'#facc15':'#2a2d3a';var numColor=loadSortMode==='order'&&i===0?'#1a1000':'#f1f5f9';h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+numBg+';color:'+numColor+'">'+(loadSortMode==='tracking'?('<b style="font-size:15px;color:#facc15">'+t4+'</b>'):loadNum)+'</div><div class="load-info"><div class="load-name">'+d.name+(d.cashon?'<span class="badge cash">착불'+(d.cashamt?' '+Number(d.cashamt).toLocaleString()+'원':'')+'</span>':'')+(d.qty>1?'<span class="badge qty">×'+d.qty+'</span>':'')+'</div><div class="load-addr">'+d.addr+'</div>'+(d.product?'<div class="load-prod">'+d.product+'</div>':'')+'</div><div class="load-right"><div class="load-seq">배송<br><b>'+delivSeq+'번</b></div>'+(loadSortMode==='order'?'<div style="font-size:11px;color:#facc15;font-weight:700;margin-top:2px">'+t4+'</div>':'')+'</div></div>'});
-    if(unassigned.length){h+='<div style="padding:8px 16px;font-size:11px;color:#f97316;background:#1a0e00;border-top:2px solid #f97316">⚠️ 순번 미지정 '+unassigned.length+'건</div>';unassigned.forEach(function(d){h+='<div class="load-item"><div class="load-num" style="background:#2a1a00;color:#f97316">?</div><div class="load-info"><div class="load-name">'+d.name+'</div><div class="load-addr">'+d.addr+'</div></div><div class="load-right"><div style="color:#f97316;font-size:11px">미지정</div></div></div>'})}
+    assigned.forEach(function(d,i){var delivSeq=orderMap[d.id],isDone=doneMap[d.id];var t4=String(d.tracking||'').slice(-4);var loadNum=loadSortMode==='order'?(i+1):'';var numBg=loadSortMode==='order'&&i===0?'#facc15':'#2a2d3a';var numColor=loadSortMode==='order'&&i===0?'#1a1000':'#f1f5f9';h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+(d.carried?'border-left:3px solid #06b6d4;':'')+'"><div class="load-num" style="background:'+numBg+';color:'+numColor+'">'+(loadSortMode==='tracking'?('<b style="font-size:15px;color:#facc15">'+t4+'</b>'):loadNum)+'</div><div class="load-info"><div class="load-name">'+d.name+(d.cashon?'<span class="badge cash">착불'+(d.cashamt?' '+Number(d.cashamt).toLocaleString()+'원':'')+'</span>':'')+(d.qty>1?'<span class="badge qty">×'+d.qty+'</span>':'')+(d.carried?'<span class="badge" style="background:#0e3a44;color:#67e8f9">인계'+(d.carriedSeq?' 원'+d.carriedSeq+'번':'')+'</span>':'')+'</div><div class="load-addr">'+d.addr+'</div>'+(d.product?'<div class="load-prod">'+d.product+'</div>':'')+'</div><div class="load-right"><div class="load-seq">배송<br><b>'+delivSeq+'번</b></div>'+(loadSortMode==='order'?'<div style="font-size:11px;color:#facc15;font-weight:700;margin-top:2px">'+t4+'</div>':'')+'</div></div>'});
+    if(unassigned.length){h+='<div style="padding:8px 16px;font-size:11px;color:#f97316;background:#1a0e00;border-top:2px solid #f97316">⚠️ 순번 미지정 '+unassigned.length+'건</div>';unassigned.forEach(function(d){h+='<div class="load-item"><div class="load-num" style="background:#2a1a00;color:#f97316">?</div><div class="load-info"><div class="load-name">'+d.name+(d.carried?'<span class="badge" style="background:#0e3a44;color:#67e8f9">인계'+(d.carriedSeq?' 원'+d.carriedSeq+'번':'')+'</span>':'')+'</div><div class="load-addr">'+d.addr+'</div></div><div class="load-right"><div style="color:#f97316;font-size:11px">미지정</div></div></div>'})}
     if(R.length){h+='<div style="padding:8px 16px;font-size:11px;color:#a78bfa;background:#1a1030;border-top:2px solid #a78bfa">↩ 반품 수거 '+R.length+'건</div>';R.forEach(function(r){var isDone=retDoneMap[r.id];h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+(isDone?'#22c55e':'#7c3aed')+';color:white;border-radius:4px">↩</div><div class="load-info"><div class="load-name">'+r.name+'<span class="badge ret">반품</span></div><div class="load-addr">'+r.addr+'</div>'+(r.reason?'<div class="load-prod" style="color:#a78bfa">'+r.reason+'</div>':'')+'</div><div class="load-right"><div style="font-size:10px;color:#64748b">'+(r.tracking?String(r.tracking).slice(-4):'')+'</div></div></div>'})}
   }
   document.getElementById('load-list').innerHTML=h;
@@ -572,6 +584,49 @@ window.skipAddr=function(idx){
   if(s){s.style.display='block';s.style.background='#1a1a1a';s.style.color='#64748b';s.textContent='⏭ 건너뜀 — 순번탭에서 나중에 처리'}
 };
 window.closeAddrModal=function(){document.getElementById('addr-modal').classList.remove('show')};
+
+window.openMergeModal=function(){
+  var sessions=recoverSessions().filter(function(s){return s.key!==currentKey});
+  var html='';
+  if(!sessions.length){html='<div style="padding:20px;text-align:center;color:#64748b">합칠 수 있는 다른 배송이 없어요.</div>'}
+  sessions.forEach(function(s){
+    var data=load(s.key+'_data',[]);
+    var done=load(s.key+'_done',{});
+    var undone=data.filter(function(d){return !done[d.id]});
+    html+='<div style="background:#1a1d27;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #2a2d3a">'
+      +'<div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:4px">🚚 '+s.title+'</div>'
+      +'<div style="font-size:11px;color:#64748b;margin-bottom:10px">미배송 '+undone.length+'건</div>'
+      +(undone.length?'<button onclick="mergeFromSession(\''+s.key+'\')" style="width:100%;padding:9px;background:#0e7490;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔗 이 배송에서 가져오기</button>':'<div style="font-size:11px;color:#22c55e">✅ 미배송 건 없음</div>')
+      +'</div>';
+  });
+  document.getElementById('merge-list').innerHTML=html;
+  document.getElementById('merge-modal').style.display='flex';
+};
+window.closeMergeModal=function(){document.getElementById('merge-modal').style.display='none'};
+
+window.mergeFromSession=function(srcKey){
+  var data=load(srcKey+'_data',[]);
+  var done=load(srcKey+'_done',{});
+  var order=load(srcKey+'_order',{});
+  var undone=data.filter(function(d){return !done[d.id]});
+  if(!undone.length){alert('가져올 미배송 건이 없어요.');return}
+  if(!confirm(undone.length+'건을 오늘 배송에 합칠까요?\n비어있는 순번은 어제 순번 그대로 유지됩니다.'))return;
+  var newItems=[];
+  undone.forEach(function(d){
+    var newId=uid();
+    var oldSeq=order[d.id]||null;
+    var nd={id:newId,name:d.name,addr:d.addr,phone:d.phone,product:d.product,tracking:d.tracking,qty:d.qty,cashon:d.cashon,cashamt:d.cashamt,carried:true,carriedSeq:oldSeq};
+    D.push(nd);newItems.push(nd);
+    if(oldSeq&&Object.values(orderMap).indexOf(oldSeq)<0){orderMap[newId]=oldSeq}
+  });
+  save(currentKey+'_data',D);save(currentKey+'_order',orderMap);
+  var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});
+  nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;
+  closeMergeModal();
+  updateCount();updHint();
+  loadMarkersWithFailCheck(newItems);
+  alert('🔗 '+undone.length+'건 합쳐졌어요!');
+};
 
 document.getElementById('xl-input').addEventListener('change',function(e){
   var file=e.target.files[0];if(!file)return;
@@ -627,7 +682,7 @@ function handleImageFile(file){if(!file)return;document.getElementById('scan-lis
 document.getElementById('cam-input').addEventListener('change',function(e){handleImageFile(e.target.files[0]);e.target.value=''});
 document.getElementById('gal-input').addEventListener('change',function(e){handleImageFile(e.target.files[0]);e.target.value=''});
 window.addManual=function(){var name=document.getElementById('m-name').value.trim();var addr=document.getElementById('m-addr').value.trim();var phone=document.getElementById('m-phone').value.trim();var tracking=document.getElementById('m-tracking').value.trim();var product=document.getElementById('m-product').value.trim();var cashamt=Number(document.getElementById('m-cashamt').value)||0;var seqInput=document.getElementById('m-seq').value.trim();if(!name){alert('이름을 입력해주세요!');return}if(!addr){alert('주소를 입력해주세요!');return}var d={id:uid(),name:name,addr:addr,phone:phone,product:product,tracking:tracking,qty:1,cashon:cashamt>0,cashamt:cashamt};D.push(d);save(currentKey+'_data',D);if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}document.getElementById('m-name').value='';document.getElementById('m-addr').value='';document.getElementById('m-phone').value='';document.getElementById('m-tracking').value='';document.getElementById('m-product').value='';document.getElementById('m-cashamt').value='';document.getElementById('m-seq').value='';geocode(addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}else{alert('⚠️ 주소를 찾지 못했어요.')}});updateCount();alert('✅ '+d.name+' 추가됐어요!')};
-window.addReturn=function(){var name=document.getElementById('r-name').value.trim();var addr=document.getElementById('r-addr').value.trim();var phone=document.getElementById('r-phone').value.trim();var tracking=document.getElementById('r-tracking').value.trim();var reason=document.getElementById('r-reason').value.trim();if(!addr){alert('주소를 입력해주세요!');return}if(!name){alert('고객 이름을 입력해주세요!');return}var r={id:'r'+uid(),name:name,addr:addr,phone:phone,tracking:tracking,reason:reason};R.push(r);save(currentKey+'_ret',R);document.getElementById('r-name').value='';document.getElementById('r-addr').value='';document.getElementById('r-phone').value='';document.getElementById('r-tracking').value='';document.getElementById('r-reason').value='';geocode(addr).then(function(c){if(c)putRetMarker(r,c)});updateCount();alert('↩ '+r.name+' 반품 등록됐어요!')};
+window.addReturn=function(){var name=document.getElementById('r-name').value.trim();var addr=document.getElementById('r-addr').value.trim();var phone=document.getElementById('r-phone').value.trim();var tracking=document.getElementById('r-tracking').value.trim();var reason=document.getElementById('r-reason').value.trim();if(!addr){alert('주소를 입력해주세요!');return}if(!name)name='이름없음';var r={id:'r'+uid(),name:name,addr:addr,phone:phone,tracking:tracking,reason:reason};R.push(r);save(currentKey+'_ret',R);document.getElementById('r-name').value='';document.getElementById('r-addr').value='';document.getElementById('r-phone').value='';document.getElementById('r-tracking').value='';document.getElementById('r-reason').value='';geocode(addr).then(function(c){if(c)putRetMarker(r,c)});updateCount();alert('↩ '+r.name+' 반품 등록됐어요!')};
 async function geocode(addr){if(coordCache[addr])return coordCache[addr];try{var res=await fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(addr),{headers:{'Authorization':'KakaoAK '+KK}});var j=await res.json();if(j.documents&&j.documents[0]){var c={lat:parseFloat(j.documents[0].y),lng:parseFloat(j.documents[0].x)};coordCache[addr]=c;save(currentKey+'_coords',coordCache);return c}}catch(e){}return null}
 async function loadMarkers(){
   if(!D.length&&!R.length)return;
