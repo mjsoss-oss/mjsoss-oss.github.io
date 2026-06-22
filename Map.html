@@ -409,7 +409,7 @@ function makeIcon(d){
   var bg,label;
   if(isOrd){bg=seq?'#f97316':'#6b7280';label=seq?String(seq):'·'}
   else{bg=isDone?'#22c55e':(seq?'#ef4444':'#6b7280');label=isDone?'✓':(seq?String(seq):'·')}
-  if(d.carried&&!isDone)bg='#06b6d4';
+  if(d.carried&&!isDone){bg='#06b6d4';if(!seq&&d.carriedSeq)label=String(d.carriedSeq)}
   var fs=String(label).length>3?'7px':String(label).length>2?'9px':'11px';
   var size=isOrd?34:(seq?34:22);
   var border=d.cashon?'3px solid #f97316':'2px solid white';
@@ -425,8 +425,9 @@ function makePopup(d){
   var smsBtn=d.cashon&&d.phone?'<a class="sms-btn" href="sms:'+d.phone+'?body='+smsMsg+'">💬 착불 문자 보내기</a>':'';
   var qtyTag=d.qty>1?'<span class="qty-tag">📦 '+d.qty+'개</span>':'';
   var carriedTag=d.carried?'<span class="track-tag" style="background:#0e7490;color:#a5f3fc">🔗 인계'+(d.carriedSeq?' (원순번 '+d.carriedSeq+'번)':'')+'</span>':'';
+  var pnumLabel=seq?(seq+'번'):(d.carried&&d.carriedSeq?('원'+d.carriedSeq+'번'):'');
   return '<div class="info-popup">'
-    +'<div class="pnum '+(isDone?'':'undone')+'\">'+(seq?seq+'번':'')+' '+(isDone?'✅':'📦')+'</div>'
+    +'<div class="pnum '+(isDone?'':'undone')+'\">'+pnumLabel+' '+(isDone?'✅':'📦')+'</div>'
     +'<div style="margin-bottom:6px">'+qtyTag+cashTag+carriedTag+'</div>'
     +'<div class="pname">'+d.name+'</div><div class="paddr">'+d.addr+'</div>'
     +(d.product?'<div class="pprod">'+d.product+'</div>':'')
