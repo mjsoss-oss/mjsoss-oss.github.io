@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>mapkakao</title>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=ea5e3391e6bf9d1900532e1b6b7780cf&autoload=false"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;background:#0f1117;color:#f1f5f9;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;overflow:hidden}
+#home-view{position:fixed;top:0;left:0;right:0;bottom:0;background:#0f1117;overflow-y:auto;z-index:99999;display:flex;flex-direction:column}
+#home-view.hide{display:none}
+#home-header{background:#0d1117;border-bottom:2px solid #22c55e;padding:16px 20px}
+#home-header h1{font-size:18px;color:#22c55e;font-weight:900}
+#home-header .subtitle{font-size:11px;color:#64748b;margin-top:2px}
+.new-delivery-btn{background:#22c55e;color:white;border:none;border-radius:12px;padding:14px 20px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin:16px;width:calc(100% - 32px)}
+.delivery-list{padding:0 16px 100px}
+.delivery-card{background:#1a1d27;border-radius:14px;padding:16px;margin-bottom:12px;border:1px solid #22c55e;display:flex;align-items:center;justify-content:space-between}
+.delivery-card.done-card{border-color:#2a2d3a;opacity:0.7}
+.dc-left{flex:1;cursor:pointer}
+.dc-date{font-size:14px;font-weight:800;color:#f1f5f9;margin-bottom:4px}
+.dc-stats{font-size:11px;color:#64748b}
+.dc-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.dc-badge{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer}
+.dc-badge.active{background:#22c55e;color:white}
+.dc-badge.done{background:#475569;color:#94a3b8}
+.dc-del-btn{padding:5px 10px;background:#2a0a0a;color:#ef4444;border:1px solid #ef4444;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer}
+.empty-home{text-align:center;padding:60px 20px;color:#64748b}
+.empty-home .ico{font-size:48px;margin-bottom:12px}
+#addr-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:99998;display:none;flex-direction:column}
+#addr-modal.show{display:flex}
+#addr-modal-inner{background:#0f1117;width:100%;max-height:90vh;border-radius:20px 20px 0 0;position:fixed;bottom:0;left:0;right:0;overflow-y:auto;padding:20px 16px 30px}
+.addr-modal-title{font-size:15px;font-weight:800;color:#facc15;margin-bottom:4px}
+.addr-modal-sub{font-size:11px;color:#64748b;margin-bottom:4px}
+.addr-modal-tip{font-size:11px;color:#f97316;background:#1a0e00;padding:8px 12px;border-radius:8px;margin-bottom:16px;line-height:1.6}
+.addr-fix-item{background:#1a1d27;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #ef4444}
+.addr-fix-item.fixed{border-color:#22c55e;opacity:0.5}
+.addr-fix-item.skipped{border-color:#475569;opacity:0.4}
+.addr-fix-name{font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:6px}
+.addr-fix-orig{font-size:10px;color:#ef4444;margin-bottom:8px;background:#2a0d0d;padding:4px 8px;border-radius:6px;line-height:1.5}
+.addr-fix-input{width:100%;background:#0f1117;border:1px solid #2a2d3a;border-radius:8px;padding:8px 10px;color:#f1f5f9;font-size:13px;font-family:inherit;margin-bottom:8px}
+.addr-fix-input:focus{outline:none;border-color:#22c55e}
+.addr-fix-hint{font-size:10px;color:#64748b;margin-bottom:8px}
+.addr-fix-btns{display:flex;gap:8px}
+.addr-kakao-btn{flex:0 0 auto;padding:9px 12px;background:#FFCD00;color:#3C1E1E;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:4px}
+.addr-confirm-btn{flex:1;padding:9px;background:#22c55e;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+.addr-confirm-btn:disabled{background:#475569;cursor:not-allowed}
+.addr-skip-btn{flex:0 0 auto;padding:9px 12px;background:#1e2030;color:#94a3b8;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer}
+.addr-modal-footer{position:sticky;bottom:0;background:#0f1117;padding:12px 0 4px;border-top:1px solid #2a2d3a;margin-top:8px}
+.addr-close-btn{width:100%;padding:13px;background:#3b82f6;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+.addr-status{font-size:11px;margin-top:6px;padding:4px 8px;border-radius:6px;text-align:center}
+.addr-status.trying{background:#1a1a0a;color:#facc15}
+.addr-status.ok{background:#0d2a0d;color:#22c55e}
+.addr-status.fail{background:#2a0d0d;color:#ef4444}
+#app{position:fixed;top:0;left:0;right:0;bottom:0;display:none}
+#app.show{display:block}
+#header{position:fixed;top:0;left:0;right:0;height:48px;background:#0d1117;border-bottom:2px solid #22c55e;display:flex;align-items:center;justify-content:space-between;padding:0 14px;z-index:9999}
+#header h1{font-size:14px;color:#22c55e;font-weight:800;cursor:pointer}
+#count{font-size:11px;color:#94a3b8}
+#map{position:fixed;top:48px;left:0;right:0;bottom:54px;z-index:1}
+#status{position:fixed;top:48px;left:0;right:0;background:rgba(0,0,0,0.85);color:#fff;font-size:11px;text-align:center;padding:4px;z-index:9000;display:none}
+#order-bar{position:fixed;top:48px;left:0;right:0;background:rgba(10,15,25,0.97);border-bottom:1px solid #2a2d3a;padding:8px 12px;display:none;gap:8px;align-items:center;flex-wrap:wrap;z-index:8999}
+#order-bar.show{display:flex}
+#order-hint{font-size:11px;color:#64748b;flex:1;text-align:center}
+.obar-btn{padding:7px 13px;border-radius:8px;border:none;font-size:12px;font-weight:700;cursor:pointer}
+.obar-btn.undo{background:#1e2030;color:#f1f5f9}
+.obar-btn.reset{background:#2a1a1a;color:#ef4444}
+.obar-btn.save{background:#22c55e;color:white}
+#order-badge{position:fixed;left:50%;transform:translateX(-50%);top:108px;background:rgba(250,204,21,0.95);color:#1a1000;padding:6px 18px;border-radius:20px;font-size:12px;font-weight:700;z-index:8997;display:none;white-space:nowrap}
+#order-badge.show{display:block}
+#footer{position:fixed;bottom:0;left:0;right:0;height:54px;background:#0d1117;border-top:1px solid #2a2d3a;display:flex;z-index:9999}
+.tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;color:#64748b;border:none;background:none;cursor:pointer}
+.tab-btn.active{color:#22c55e}
+.tab-btn .ico{font-size:18px}
+#unassigned-panel{position:fixed;left:0;right:0;bottom:54px;background:#0f1117;border-top:2px solid #f97316;z-index:500;display:none;flex-direction:column}
+#unassigned-panel.show{display:flex}
+#unassigned-panel-head{padding:8px 16px;background:#1a0e00;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#unassigned-panel-body{max-height:35vh;overflow-y:auto}
+#load-view{position:fixed;top:48px;left:0;right:0;bottom:54px;background:#0f1117;overflow-y:auto;z-index:8000;display:none}
+#load-view.show{display:block}
+.lv-head{background:#0d1117;padding:12px 16px;border-bottom:1px solid #2a2d3a;position:sticky;top:0;z-index:1}
+.lv-title{font-size:15px;font-weight:800;color:#facc15;margin-bottom:3px}
+.lv-sub{font-size:11px;color:#64748b}
+.load-item{padding:12px 16px;border-bottom:1px solid #1e2130;display:flex;align-items:center;gap:12px}
+.load-num{min-width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:white;flex-shrink:0}
+.load-info{flex:1;overflow:hidden}
+.load-name{font-size:13px;font-weight:700;margin-bottom:2px}
+.load-addr{font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.load-prod{font-size:11px;color:#86efac;margin-top:2px}
+.load-right{text-align:right;flex-shrink:0}
+.load-seq b{color:#f1f5f9;font-size:15px}
+.badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:700;margin-left:4px}
+.badge.cash{background:#2a1a0a;color:#f97316}
+.badge.qty{background:#1a1a2a;color:#93c5fd}
+.badge.ret{background:#1a1a3a;color:#a78bfa}
+.unassigned-item{padding:10px 16px;border-bottom:1px solid #1e2130;display:flex;align-items:center;gap:10px}
+.unassigned-info{flex:1;overflow:hidden}
+.unassigned-name{font-size:12px;font-weight:700;color:#f1f5f9;margin-bottom:2px}
+.unassigned-addr{font-size:10px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unassigned-actions{display:flex;gap:5px;align-items:center;flex-shrink:0}
+.kakao-small{padding:5px 7px;background:#FFCD00;color:#3C1E1E;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
+.seq-input{width:48px;padding:5px 4px;background:#1a1d27;border:1px solid #2a2d3a;border-radius:6px;color:#f1f5f9;font-size:12px;text-align:center}
+.seq-assign-btn{padding:5px 8px;background:#22c55e;color:white;border:none;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+#scan-view{position:fixed;top:48px;left:0;right:0;bottom:54px;background:#0f1117;overflow-y:auto;z-index:8000;display:none;padding:16px}
+#scan-view.show{display:block}
+.scan-title{font-size:15px;font-weight:800;color:#22c55e;margin-bottom:4px}
+.scan-sub{font-size:11px;color:#64748b;margin-bottom:12px}
+.scan-btn{width:100%;padding:14px;background:#1a2a1a;border:2px dashed #22c55e;border-radius:16px;color:#22c55e;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+.scan-btn .ico{font-size:24px}
+.scan-item{background:#1a1d27;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #2a2d3a}
+.scan-item.ok{border-color:#22c55e}
+.scan-item.err{border-color:#ef4444}
+.scan-item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.scan-item-status{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+.scan-item-status.ok{background:#0d2a0d;color:#22c55e}
+.scan-item-status.err{background:#2a0d0d;color:#ef4444}
+.scan-field{margin-bottom:6px}
+.scan-field label{font-size:10px;color:#64748b;display:block;margin-bottom:2px}
+.scan-field input{width:100%;background:#0f1117;border:1px solid #2a2d3a;border-radius:6px;padding:6px 8px;color:#f1f5f9;font-size:12px;font-family:inherit}
+.scan-field input:focus{outline:none;border-color:#22c55e}
+.scan-add-btn{width:100%;padding:10px;background:#22c55e;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px}
+.ret-add-btn{width:100%;padding:10px;background:#7c3aed;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px}
+.scan-del-btn{background:#2a1a1a;color:#ef4444;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.scan-loading{text-align:center;padding:20px;color:#64748b;font-size:13px}
+.section-divider{margin:16px 0;padding-top:16px;border-top:1px solid #2a2d3a}
+.section-label{font-size:13px;font-weight:700;color:#94a3b8;margin-bottom:10px}
+.manual-field{margin-bottom:8px}
+.manual-field label{font-size:11px;color:#64748b;display:block;margin-bottom:3px}
+.manual-field input{width:100%;background:#1a1d27;border:1px solid #2a2d3a;border-radius:8px;padding:8px 10px;color:#f1f5f9;font-size:13px;font-family:inherit}
+.manual-field input:focus{outline:none;border-color:#22c55e}
+.manual-add-btn{width:100%;padding:12px;background:#3b82f6;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+.info-popup{padding:14px 16px;min-width:220px;max-width:270px}
+.info-popup .pnum{font-size:20px;font-weight:900;color:#22c55e;margin-bottom:2px}
+.info-popup .pnum.undone{color:#ef4444}
+.info-popup .pnum.ret{color:#a78bfa}
+.info-popup .pnum.retdone{color:#22c55e}
+.info-popup .pname{font-weight:700;color:#111;font-size:15px;margin:3px 0}
+.info-popup .paddr{color:#444;font-size:13px;line-height:1.6;margin-bottom:6px;font-weight:500}
+.info-popup .pprod{background:#f0fff4;color:#2e7d32;padding:4px 8px;border-radius:6px;font-size:11px;margin-bottom:6px}
+.info-popup .pret{background:#ede9fe;color:#5b21b6;padding:4px 8px;border-radius:6px;font-size:11px;margin-bottom:6px}
+.info-popup .pmeta{color:#888;font-size:11px;margin-bottom:8px}
+.info-popup .qty-tag{display:inline-block;background:#1d4ed8;color:white;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-bottom:6px;margin-right:4px}
+.info-popup .cash-tag{display:inline-block;background:#7c3500;color:#fed7aa;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-bottom:6px}
+.info-popup .track-tag{display:inline-block;background:#1a2a1a;color:#86efac;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;margin-bottom:4px;margin-right:4px}
+.kakao-btn{display:block;padding:9px;background:#FFCD00;color:#3C1E1E;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;width:100%;text-align:center;text-decoration:none;margin-bottom:6px}
+.sms-btn{display:block;padding:9px;background:#1d4ed8;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%;margin-bottom:6px;text-decoration:none;text-align:center}
+.done-btn{display:block;padding:9px;background:#22c55e;color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;width:100%}
+.done-btn.undo{background:#475569}
+.done-btn.ret{background:#7c3aed}
+.done-btn.ret.undo{background:#475569}
+
+</style>
+</head>
+<body>
+<div id="home-view">
+  <div id="home-header">
+    <h1>🚚 신성맵</h1>
+    <div class="subtitle">천일택배 배송 관리</div>
+  </div>
+  <button class="new-delivery-btn" onclick="createNewDelivery()">➕ 새 배송 만들기</button>
+  <div class="delivery-list" id="delivery-list"></div>
+  <div style="padding:16px 20px 24px;text-align:center;font-size:11px;color:#475569;line-height:1.8;border-top:1px solid #1e2130;margin-top:8px">
+    상호: 오예스 화물 &nbsp;|&nbsp; 대표자: 오신성 &nbsp;|&nbsp; 사업자등록번호: 113-65-00760<br>
+    사업장 주소: 서울특별시 서대문구 신촌로3나길 15-4, 402호(창천동)
+  </div>
+</div>
+<div id="addr-modal">
+  <div id="addr-modal-inner">
+    <div class="addr-modal-title">⚠️ 주소 확인 필요</div>
+    <div class="addr-modal-sub">카카오맵에서 위치 확인 후 주소를 짧게 수정해주세요.</div>
+    <div class="addr-modal-tip">💡 팁: 건물명·층수·괄호 빼고 도로명+번지만 남기면 잘 찾아요!<br>예) 서울특별시 마포구 동교로46길 23 연남동 1.5층 → <b>서울 마포구 동교로46길 23</b></div>
+    <div id="addr-fix-list"></div>
+    <div class="addr-modal-footer">
+      <button class="addr-close-btn" onclick="closeAddrModal()">✅ 확인 완료 — 지도로 이동</button>
+    </div>
+  </div>
+</div>
+<div id="app">
+  <div id="header">
+    <h1 onclick="goHome()">🚚 <span id="delivery-title">신성맵</span></h1>
+    <span id="count">데이터 없음</span>
+  </div>
+  <div id="status"></div>
+  <div id="order-bar">
+    <button class="obar-btn undo" id="btn-undo">↩ 되돌리기</button>
+    <span id="order-hint">핀을 탭해서 순번 지정</span>
+    <button class="obar-btn reset" id="btn-reset">🗑 초기화</button>
+    <button class="obar-btn save" id="btn-save">🔒 저장·확정</button>
+  </div>
+  <div id="order-badge">📌 순번 지정 모드</div>
+  <div id="map"></div>
+  <div id="unassigned-panel">
+    <div id="unassigned-panel-head">
+      <span style="font-size:12px;font-weight:700;color:#f97316" id="unassigned-count-label">⚠️ 미지정 0건</span>
+      <button onclick="togglePanel()" id="panel-toggle-btn" style="background:none;border:none;color:#94a3b8;font-size:12px;cursor:pointer;padding:4px 8px">▲ 접기</button>
+    </div>
+    <div id="unassigned-panel-body"></div>
+  </div>
+  <div id="load-view">
+    <div class="lv-head"><div class="lv-title">📦 적재 순서</div><div class="lv-sub">마지막 배송지부터 → 1번을 맨 나중에 실으세요</div></div>
+    <div id="load-list"></div>
+  </div>
+  <div id="scan-view">
+    <div class="scan-title">📷 배송지 추가 / 반품 등록</div>
+    <div class="scan-sub">배송지 추가 또는 반품 지역을 등록하세요.</div>
+    <button class="scan-btn" onclick="document.getElementById('cam-input').click()"><span class="ico">📸</span> 카메라로 송장 찍기</button>
+    <button class="scan-btn" style="background:#1a1a2b;border-color:#3b82f6;color:#93c5fd" onclick="document.getElementById('gal-input').click()"><span class="ico">🖼️</span> 갤러리에서 선택</button>
+    <button class="scan-btn" style="background:#1a1a0a;border-color:#facc15;color:#facc15" onclick="document.getElementById('xl-input').click()"><span class="ico">📊</span> 엑셀 파일 업로드</button>
+    <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none">
+    <input type="file" id="gal-input" accept="image/*" style="display:none">
+    <input type="file" id="xl-input" accept=".xlsx,.xls" style="display:none">
+    <div id="scan-list"></div>
+    <div class="section-divider">
+      <div class="section-label">✏️ 배송지 수동 입력</div>
+      <div class="manual-field"><label>받는사람 이름</label><input type="text" id="m-name" placeholder="홍길동"></div>
+      <div class="manual-field"><label>주소</label><input type="text" id="m-addr" placeholder="서울 마포구 ..."></div>
+      <div class="manual-field"><label>전화번호</label><input type="tel" id="m-phone" placeholder="010-0000-0000"></div>
+      <div class="manual-field"><label>송장번호</label><input type="text" id="m-tracking" placeholder="12641600000"></div>
+      <div class="manual-field"><label>품명</label><input type="text" id="m-product" placeholder="(선택사항)"></div>
+      <div class="manual-field"><label>착불금액</label><input type="number" id="m-cashamt" placeholder="0 (현불이면 비워두세요)"></div>
+      <div class="manual-field"><label>끼워넣을 순번 <span style="color:#64748b;font-weight:400">(비우면 마지막)</span></label><input type="number" id="m-seq" placeholder="예: 5"></div>
+      <button class="manual-add-btn" onclick="addManual()">➕ 배송지 추가</button>
+    </div>
+    <div class="section-divider">
+      <div class="section-label">↩ 반품 지역 등록</div>
+      <div class="manual-field"><label>고객 이름</label><input type="text" id="r-name" placeholder="홍길동"></div>
+      <div class="manual-field"><label>주소 ⭐</label><input type="text" id="r-addr" placeholder="서울 마포구 ..."></div>
+      <div class="manual-field"><label>전화번호</label><input type="tel" id="r-phone" placeholder="010-0000-0000"></div>
+      <div class="manual-field"><label>송장번호</label><input type="text" id="r-tracking" placeholder="12641600000"></div>
+      <div class="manual-field"><label>반품 사유</label><input type="text" id="r-reason" placeholder="수취거부 / 주소오류 / 고객요청 등"></div>
+      <button class="ret-add-btn" onclick="addReturn()">↩ 반품 등록</button>
+    </div>
+    <div class="section-divider">
+      <div class="section-label">🔗 이전 배송 합치기</div>
+      <button class="manual-add-btn" style="background:#0e7490" onclick="openMergeModal()">🔗 이전 미배송건 가져오기</button>
+    </div>
+  </div>
+  <div id="footer">
+    <button class="tab-btn active" id="tab-map" onclick="goTab('map')"><span class="ico">🗺️</span>지도</button>
+    <button class="tab-btn" id="tab-order" onclick="goTab('order')"><span class="ico">📌</span>순번</button>
+    <button class="tab-btn" id="tab-load" onclick="goTab('load')"><span class="ico">📦</span>적재</button>
+    <button class="tab-btn" id="tab-scan" onclick="goTab('scan')"><span class="ico">📷</span>추가</button>
+  </div>
+</div>
+<div id="merge-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:99997;display:none;flex-direction:column">
+  <div style="background:#0f1117;width:100%;max-height:80vh;border-radius:20px 20px 0 0;position:fixed;bottom:0;left:0;right:0;overflow-y:auto;padding:20px 16px 30px">
+    <div style="font-size:15px;font-weight:800;color:#22d3ee;margin-bottom:4px">🔗 이전 배송 합치기</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:14px">다른 배송의 미배송 건을 오늘 배송에 가져옵니다. 원래 순번은 비어있으면 그대로 유지돼요.</div>
+    <div id="merge-list"></div>
+    <button onclick="closeMergeModal()" style="width:100%;padding:13px;background:#475569;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;margin-top:6px;cursor:pointer">닫기</button>
+  </div>
+</div>
+<script>
+var KK='5c869f06febef52651e59f73e59d4f15';
+var KEY_SESSIONS='ss_sessions_v2';
+var currentKey=null;
+var D=[],R=[],doneMap={},retDoneMap={},coordCache={},orderMap={},orderHistory=[],isLocked=false,nextSeq=1;
+var markerMap={},retMarkerMap={},markerIWMap={},retMarkerIWMap={},currentIW=null,myMarker=null,myCircle=null,currentTab='map',loadSortMode='tracking';
+var scanItems=[],failedAddrs=[],panelOpen=true;
+
+function load(k,def){try{var v=JSON.parse(localStorage.getItem(k));return(v===null||v===undefined)?def:v}catch(e){return def}}
+function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function uid(){return 'd'+Date.now()+Math.random().toString(36).slice(2,6)}
+function getSessions(){return load(KEY_SESSIONS,[])}
+function saveSessions(s){save(KEY_SESSIONS,s)}
+
+function recoverSessions(){
+  var sessions=getSessions();
+  var existingKeys=sessions.map(function(s){return s.key});
+  var recovered=false;
+  for(var i=0;i<localStorage.length;i++){
+    var k=localStorage.key(i);
+    if(k&&k.indexOf('ss_dlv_')===0&&k.indexOf('_data')>0){
+      var baseKey=k.replace('_data','');
+      if(existingKeys.indexOf(baseKey)<0){
+        var data=load(baseKey+'_data',[]);
+        if(data.length>0){
+          var done=load(baseKey+'_done',{});
+          var ts=baseKey.replace('ss_dlv_','');
+          var d=new Date(Number(ts));
+          var dateStr=isNaN(d.getTime())?'이전 배송':((d.getMonth()+1)+'/'+(d.getDate())+' 배송');
+          sessions.push({key:baseKey,title:dateStr,created:Number(ts)||Date.now(),done:Object.values(done).filter(Boolean).length,total:data.length});
+          existingKeys.push(baseKey);recovered=true;
+        }
+      }
+    }
+  }
+  if(recovered){sessions.sort(function(a,b){return b.created-a.created});saveSessions(sessions)}
+  return sessions;
+}
+
+function createNewDelivery(){
+  var now=new Date();
+  var dateStr=(now.getMonth()+1)+'/'+(now.getDate())+' 배송';
+  var key='ss_dlv_'+Date.now();
+  var sessions=getSessions();
+  sessions.unshift({key:key,title:dateStr,created:Date.now(),done:0,total:0});
+  saveSessions(sessions);
+  openDelivery(key,dateStr);
+}
+
+function deleteDelivery(key,title,e){
+  e.stopPropagation();
+  if(!confirm('['+title+'] 배송을 삭제할까요?'))return;
+  var keysToDelete=[];
+  for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(key)===0)keysToDelete.push(k)}
+  keysToDelete.forEach(function(k){localStorage.removeItem(k)});
+  saveSessions(getSessions().filter(function(s){return s.key!==key}));
+  renderHome();
+}
+
+var kakaoReady=false;
+kakao.maps.load(function(){kakaoReady=true;});
+
+function initKakaoMap(){
+  if(map)return;
+  if(!kakaoReady)return;
+  var container=document.getElementById('map');
+  map=new kakao.maps.Map(container,{center:new kakao.maps.LatLng(37.556,126.920),level:5});
+  var zoomCtrl=new kakao.maps.ZoomControl();
+  map.addControl(zoomCtrl,kakao.maps.ControlPosition.RIGHT);
+  // 내위치 버튼
+  var locBtn=document.createElement('button');
+  locBtn.innerHTML='📍';locBtn.style.cssText='position:fixed;right:14px;bottom:70px;width:42px;height:42px;background:white;border:2px solid #ccc;border-radius:10px;font-size:20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:9000';
+  locBtn.onclick=function(){if(myMarker){map.setCenter(myMarker.getPosition());map.setLevel(3);}else{navigator.geolocation.getCurrentPosition(function(p){map.setCenter(new kakao.maps.LatLng(p.coords.latitude,p.coords.longitude));map.setLevel(3);});}};
+  document.body.appendChild(locBtn);
+  // GPS
+  navigator.geolocation&&navigator.geolocation.watchPosition(function(pos){
+    var la=pos.coords.latitude,ln=pos.coords.longitude;
+    var latlng=new kakao.maps.LatLng(la,ln);
+    if(myMarker){myMarker.setPosition(latlng);}
+    else{
+      var svg='<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="9" fill="%233b82f6" stroke="white" stroke-width="3"/></svg>';
+      var img=new kakao.maps.MarkerImage('data:image/svg+xml;utf8,'+svg,new kakao.maps.Size(22,22),{offset:new kakao.maps.Point(11,11)});
+      myMarker=new kakao.maps.Marker({position:latlng,image:img,map:map,zIndex:100});
+    }
+  },null,{enableHighAccuracy:true,maximumAge:3000});
+}
+
+function openDelivery(key,title){
+  currentKey=key;
+  D=load(key+'_data',[]);R=load(key+'_ret',[]);
+  doneMap=load(key+'_done',{});retDoneMap=load(key+'_rdone',{});
+  coordCache=load(key+'_coords',{});orderMap=load(key+'_order',{});
+  isLocked=load(key+'_locked',false);
+  var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});
+  nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;
+  document.getElementById('delivery-title').textContent=title;
+  document.getElementById('home-view').classList.add('hide');
+  document.getElementById('app').classList.add('show');
+  updateCount();updHint();
+  setTimeout(function(){if(D.length>0||R.length>0)loadMarkers()},100);
+}
+
+function goHome(){
+  var sessions=getSessions();
+  sessions.forEach(function(s){if(s.key===currentKey){s.total=D.length;s.done=Object.values(doneMap).filter(Boolean).length}});
+  saveSessions(sessions);
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('home-view').classList.remove('hide');
+  document.getElementById('unassigned-panel').classList.remove('show');
+  D=[];R=[];doneMap={};retDoneMap={};coordCache={};orderMap={};orderHistory=[];
+  isLocked=false;nextSeq=1;currentKey=null;
+  closeAllKakaoWindows();
+  Object.keys(markerMap).forEach(function(id){try{markerMap[id].setMap(null)}catch(e){}});
+  Object.keys(retMarkerMap).forEach(function(id){try{retMarkerMap[id].setMap(null)}catch(e){}});
+  markerMap={};retMarkerMap={};markerIWMap={};retMarkerIWMap={};
+  renderHome();
+}
+
+function renderHome(){
+  var sessions=recoverSessions();
+  var el=document.getElementById('delivery-list');
+  if(!sessions.length){el.innerHTML='<div class="empty-home"><div class="ico">🗺️</div><div>배송이 없어요.<br>위 버튼으로 새 배송을 만드세요!</div></div>';return}
+  var h='';
+  sessions.forEach(function(s){
+    var pct=s.total?Math.round(s.done/s.total*100):0;
+    var isDone=s.total>0&&s.done>=s.total;
+    h+='<div class="delivery-card'+(isDone?' done-card':'')+'">'
+      +'<div class="dc-left" onclick="openDelivery(\''+s.key+'\',\''+s.title+'\')">'
+      +'<div class="dc-date">🚚 '+s.title+'</div>'
+      +'<div class="dc-stats">완료 '+s.done+'/'+(s.total||0)+'건'+(s.total?' ('+pct+'%)':'')+'</div>'
+      +'</div><div class="dc-right">'
+      +'<div class="dc-badge '+(isDone?'done':'active')+'" onclick="openDelivery(\''+s.key+'\',\''+s.title+'\')">'+(isDone?'완료':'진행중')+'</div>'
+      +'<button class="dc-del-btn" onclick="deleteDelivery(\''+s.key+'\',\''+s.title+'\',event)">🗑</button>'
+      +'</div></div>';
+  });
+  el.innerHTML=h;
+}
+
+var map=null;
+navigator.geolocation&&navigator.geolocation.watchPosition(function(pos){
+  var la=pos.coords.latitude,ln=pos.coords.longitude;
+  var latlng=new kakao.maps.LatLng(la,ln);
+  if(myMarker){myMarker.setPosition(latlng);}
+  else{
+    var svg='<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="9" fill="%233b82f6" stroke="white" stroke-width="3"/></svg>';
+    var img=new kakao.maps.MarkerImage('data:image/svg+xml;utf8,'+svg,new kakao.maps.Size(22,22),{offset:new kakao.maps.Point(11,11)});
+    myMarker=new kakao.maps.Marker({position:latlng,image:img,map:map,zIndex:100});
+  }
+},null,{enableHighAccuracy:true,maximumAge:3000});
+
+
+var OFFSETS=[[0,0],[0.00010,0],[-0.00010,0],[0,0.00013],[0,-0.00013],[0.00010,0.00013],[-0.00010,0.00013],[0.00010,-0.00013]];
+
+function getSameCoordItems(d){
+  var myCoord=coordCache[d.addr];
+  if(!myCoord)return[d];
+  var sameAddrKeys=Object.keys(coordCache).filter(function(k){
+    var c=coordCache[k];
+    return Math.abs(c.lat-myCoord.lat)<0.00002&&Math.abs(c.lng-myCoord.lng)<0.00002;
+  });
+  return D.filter(function(x){return sameAddrKeys.indexOf(x.addr)>=0});
+}
+
+function getOffsetByCoord(d){
+  var items=getSameCoordItems(d);
+  var idx=items.findIndex(function(x){return x.id===d.id});
+  if(idx<0)return[0,0];
+  return OFFSETS[idx%OFFSETS.length]||[0,0];
+}
+
+function makeMarkerSvg(bg,label,size,cashon){
+  var fs=String(label).length>3?'7':String(label).length>2?'9':'11';
+  var stroke=cashon?'#f97316':'white';
+  var sw=cashon?3:2;
+  return encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="'+size+'" height="'+size+'"><circle cx="'+(size/2)+'" cy="'+(size/2)+'" r="'+(size/2-1)+'" fill="'+bg+'" stroke="'+stroke+'" stroke-width="'+sw+'"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="'+fs+'" font-weight="900" fill="white" font-family="Arial">'+label+'</text></svg>');
+}
+function makeIcon(d){
+  var isDone=doneMap[d.id],seq=orderMap[d.id],isOrd=currentTab==='order';
+  var bg,label;
+  if(isOrd){bg=seq?'#f97316':'#6b7280';label=seq?String(seq):'·'}
+  else{bg=isDone?'#22c55e':(seq?'#ef4444':'#6b7280');label=isDone?'✓':(seq?String(seq):'·')}
+  if(d.carried&&!isDone){bg='#06b6d4';if(!seq&&d.carriedSeq)label=String(d.carriedSeq)}
+  var size=isOrd?34:(seq?34:22);
+  var src='data:image/svg+xml;charset=utf-8,'+makeMarkerSvg(bg,label,size,d.cashon);
+  return new kakao.maps.MarkerImage(src,new kakao.maps.Size(size,size),{offset:new kakao.maps.Point(size/2,size/2)});
+}
+function makeRetIcon(r){
+  var isDone=retDoneMap[r.id];var bg=isDone?'#22c55e':'#a78bfa';
+  var svg=encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect x="1" y="1" width="30" height="30" rx="6" fill="'+bg+'" stroke="white" stroke-width="2"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="16" font-weight="900" fill="white" font-family="Arial">'+(isDone?'✓':'↩')+'</text></svg>');
+  return new kakao.maps.MarkerImage('data:image/svg+xml;charset=utf-8,'+svg,new kakao.maps.Size(32,32),{offset:new kakao.maps.Point(16,16)});
+}
+function makeRetPopup(r){var isDone=retDoneMap[r.id];return '<div class="info-popup">'+'<div class="pnum '+(isDone?'retdone':'ret')+'">↩ '+(isDone?'수거 완료':'반품 수거')+'</div>'+'<div class="pname">'+r.name+'</div><div class="paddr">'+r.addr+'</div>'+(r.reason?'<div class="pret">사유: '+r.reason+'</div>':'')+'<div class="pmeta">📞 '+(r.phone||'-')+(r.tracking?' · 송장 '+String(r.tracking).slice(-4):'')+'</div>'+'<a class="kakao-btn" href="https://map.kakao.com/?q='+encodeURIComponent(r.addr)+'" target="_blank">🗺️ 카카오맵으로 보기</a>'+'<button class="done-btn ret '+(isDone?'undo':'')+'\" onclick="toggleRetDone(\''+r.id+'\')">'+(isDone?'↩ 수거 취소':'✅ 반품 수거 완료')+'</button></div>'}
+
+function putMarker(d,coord){
+  if(!map){console.warn('map not ready');return;}
+  if(markerMap[d.id])markerMap[d.id].setMap(null);
+  var off=getOffsetByCoord(d);
+  var pos=new kakao.maps.LatLng(coord.lat+off[0],coord.lng+off[1]);
+  var m=new kakao.maps.Marker({position:pos,image:makeIcon(d),map:map,clickable:true});
+  var iw=new kakao.maps.InfoWindow({content:'<div style="min-width:220px;max-width:270px;padding:2px">'+makePopup(d)+'</div>',removable:true});
+  (function(dd,mk,infoWin){
+    kakao.maps.event.addListener(mk,'click',function(){
+      if(currentTab==='order'){onMarkerClick(dd);}
+      else{closeAllKakaoWindows();infoWin.open(map,mk);currentIW=infoWin;}
+    });
+  })(d,m,iw);
+  markerMap[d.id]=m;markerIWMap[d.id]=iw;
+}
+function putRetMarker(r,coord){
+  if(retMarkerMap[r.id])retMarkerMap[r.id].setMap(null);
+  var pos=new kakao.maps.LatLng(coord.lat,coord.lng);
+  var m=new kakao.maps.Marker({position:pos,image:makeRetIcon(r),map:map,clickable:true});
+  var iw=new kakao.maps.InfoWindow({content:'<div style="min-width:220px;max-width:270px;padding:2px">'+makeRetPopup(r)+'</div>',removable:true});
+  kakao.maps.event.addListener(m,'click',function(){closeAllKakaoWindows();iw.open(map,m);currentIW=iw;});
+  retMarkerMap[r.id]=m;retMarkerIWMap[r.id]=iw;
+}
+
+function onMarkerClick(d){
+  if(currentTab==='order'){
+    if(isLocked){var input=prompt('몇 번으로 끼워넣을까요?','');if(!input||isNaN(Number(input)))return;var insertAt=Number(input);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap);refreshIcons();updHint();renderUnassignedPanel();return}
+    closeAllKakaoWindows();
+    orderHistory.push(JSON.parse(JSON.stringify(orderMap)));
+    if(orderMap[d.id]){delete orderMap[d.id];var s=Object.entries(orderMap).sort(function(a,b){return a[1]-b[1]});orderMap={};s.forEach(function(e,i){orderMap[e[0]]=i+1});nextSeq=s.length+1}
+    else{orderMap[d.id]=nextSeq++}
+    save(currentKey+'_order',orderMap);refreshIcons();updHint();renderUnassignedPanel();
+  }else{if(markerMap[d.id])markerMap[d.id].openPopup()}
+}
+
+window.toggleDone=function(id){doneMap[id]=!doneMap[id];save(currentKey+'_done',doneMap);var d=D.find(function(x){return x.id===id});if(d&&markerMap[id]){markerMap[id].setImage(makeIcon(d));if(markerIWMap[id])markerIWMap[id].setContent('<div style="min-width:220px;max-width:270px;padding:2px">'+makePopup(d)+'</div>');}updateCount();};
+window.toggleRetDone=function(id){retDoneMap[id]=!retDoneMap[id];save(currentKey+'_rdone',retDoneMap);var r=R.find(function(x){return x.id===id});if(r&&retMarkerMap[id]){retMarkerMap[id].setImage(makeRetIcon(r));if(retMarkerIWMap[id])retMarkerIWMap[id].setContent('<div style="min-width:220px;max-width:270px;padding:2px">'+makeRetPopup(r)+'</div>');}updateCount();};
+function updateCount(){var dn=Object.values(doneMap).filter(Boolean).length;var rn=Object.values(retDoneMap).filter(Boolean).length;document.getElementById('count').textContent='배송 '+dn+'/'+D.length+'건'+(R.length?' · 반품 '+rn+'/'+R.length:'')}
+function updHint(){var n=Object.keys(orderMap).length;document.getElementById('order-hint').textContent=isLocked?'🔒 순번 확정됨':(n?n+'개 순번 지정됨':'핀 탭해서 순번 지정')}
+
+function renderUnassignedPanel(){
+  var unassigned=D.filter(function(d){return !orderMap[d.id]&&!doneMap[d.id]});
+  var panel=document.getElementById('unassigned-panel');
+  var label=document.getElementById('unassigned-count-label');
+  if(currentTab!=='order'){panel.classList.remove('show');return}
+  panel.classList.add('show');
+  if(!unassigned.length){label.textContent='✅ 미지정 없음';label.style.color='#22c55e';document.getElementById('unassigned-panel-body').innerHTML='<div style="padding:10px 16px;font-size:12px;color:#22c55e">모든 배송지 순번 지정 완료! 🎉</div>';return}
+  label.textContent='⚠️ 미지정 '+unassigned.length+'건';label.style.color='#f97316';
+  if(!panelOpen)return;
+  var h='';
+  unassigned.forEach(function(d){h+='<div class="unassigned-item"><div class="unassigned-info"><div class="unassigned-name">'+d.name+(d.cashon?'<span class="badge cash">착불</span>':'')+(d.carried?'<span class="badge" style="background:#0e3a44;color:#67e8f9">인계</span>':'')+'</div><div class="unassigned-addr">'+d.addr+'</div></div><div class="unassigned-actions"><a class="kakao-small" href="https://map.kakao.com/?q='+encodeURIComponent(d.addr)+'" target="_blank">🗺️</a><input class="seq-input" type="number" placeholder="순번" id="seq-'+d.id+'"><button class="seq-assign-btn" onclick="assignSeq(\''+d.id+'\')">지정</button></div></div>'});
+  document.getElementById('unassigned-panel-body').innerHTML=h;
+}
+window.togglePanel=function(){var body=document.getElementById('unassigned-panel-body');var btn=document.getElementById('panel-toggle-btn');if(panelOpen){body.style.display='none';btn.textContent='▼ 펼치기';panelOpen=false}else{body.style.display='';btn.textContent='▲ 접기';panelOpen=true;renderUnassignedPanel()}};
+
+window.assignSeq=function(id){
+  var input=document.getElementById('seq-'+id);var val=Number(input.value);
+  if(!val||isNaN(val)){alert('순번을 입력해주세요!');return}
+  orderHistory.push(JSON.parse(JSON.stringify(orderMap)));
+  Object.keys(orderMap).forEach(function(oid){if(orderMap[oid]>=val)orderMap[oid]+=1});
+  orderMap[id]=val;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;
+  save(currentKey+'_order',orderMap);
+  var d=D.find(function(x){return x.id===id});
+  if(d){
+    if(markerMap[d.id]){
+      markerMap[d.id].setIcon(makeIcon(d));
+      if(markerIWMap[d.id])markerIWMap[d.id].setContent('<div style="min-width:220px;max-width:270px;padding:2px">'+makePopup(d)+'</div>');
+      refreshIcons();
+    }else{
+      geocode(d.addr).then(function(c){if(c){putMarker(d,c)}refreshIcons()});
+    }
+  }
+  updHint();renderUnassignedPanel();
+  alert('✅ '+val+'번으로 지정됐어요!');
+};
+
+function goTab(t){
+  currentTab=t;
+  ['map','order','load','scan'].forEach(function(id){var b=document.getElementById('tab-'+id);if(b)b.classList.toggle('active',id===t)});
+  document.getElementById('order-bar').classList.toggle('show',t==='order');
+  document.getElementById('order-badge').classList.toggle('show',t==='order');
+  document.getElementById('load-view').classList.toggle('show',t==='load');
+  document.getElementById('scan-view').classList.toggle('show',t==='scan');
+  if(t==='order'){renderUnassignedPanel()}else{document.getElementById('unassigned-panel').classList.remove('show')}
+  if(t==='load')renderLoad();
+  if(t==='map'){setTimeout(function(){if(!map)initKakaoMap();if(map)map.relayout();},100);}
+  refreshIcons();
+}
+document.getElementById('btn-undo').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!orderHistory.length)return;orderMap=orderHistory.pop();var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;save(currentKey+'_order',orderMap);refreshIcons();updHint();renderUnassignedPanel()};
+document.getElementById('btn-reset').onclick=function(){if(isLocked){alert('🔒 확정된 순번입니다.');return}if(!confirm('순번을 모두 초기화할까요?'))return;orderHistory.push(JSON.parse(JSON.stringify(orderMap)));orderMap={};nextSeq=1;save(currentKey+'_order',orderMap);refreshIcons();updHint();renderUnassignedPanel()};
+document.getElementById('btn-save').onclick=function(){if(isLocked){alert('🔒 이미 확정된 순번입니다.');return}var n=Object.keys(orderMap).length;if(!n){alert('지정된 순번이 없습니다.');return}if(!confirm(n+'개 순번을 저장·확정합니다.\n계속할까요?'))return;isLocked=true;save(currentKey+'_order',orderMap);save(currentKey+'_locked',true);refreshIcons();updHint();alert('🔒 순번 확정!');goTab('map')};
+
+function renderLoad(){
+  var assigned=D.filter(function(d){return orderMap[d.id]});
+  var unassigned=D.filter(function(d){return !orderMap[d.id]});
+  if(loadSortMode==='tracking'){assigned.sort(function(a,b){return String(b.tracking||'').slice(-4).localeCompare(String(a.tracking||'').slice(-4))})}
+  else{assigned.sort(function(a,b){return orderMap[b.id]-orderMap[a.id]})}
+  var h='';
+  if(!assigned.length){h='<div style="padding:40px;text-align:center;color:#64748b">순번 지정 후 저장해주세요.</div>'}
+  else{
+    h+='<div style="padding:8px 12px;background:#0a0c10;border-bottom:1px solid #1e2130;display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;color:#64748b">총 '+assigned.length+'개</span><div style="display:flex;gap:6px"><button onclick="setLoadSort(\'tracking\')" style="padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:'+(loadSortMode==='tracking'?'#facc15':'#2a2d3a')+';color:'+(loadSortMode==='tracking'?'#1a1000':'#94a3b8')+'">송장번호순</button><button onclick="setLoadSort(\'order\')" style="padding:4px 10px;border-radius:6px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:'+(loadSortMode==='order'?'#22c55e':'#2a2d3a')+';color:'+(loadSortMode==='order'?'white':'#94a3b8')+'">적재순서</button></div></div>';
+    assigned.forEach(function(d,i){var delivSeq=orderMap[d.id],isDone=doneMap[d.id];var t4=String(d.tracking||'').slice(-4);var loadNum=loadSortMode==='order'?(i+1):'';var numBg=loadSortMode==='order'&&i===0?'#facc15':'#2a2d3a';var numColor=loadSortMode==='order'&&i===0?'#1a1000':'#f1f5f9';h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+(d.carried?'border-left:3px solid #06b6d4;':'')+'"><div class="load-num" style="background:'+numBg+';color:'+numColor+'">'+(loadSortMode==='tracking'?('<b style="font-size:15px;color:#facc15">'+t4+'</b>'):loadNum)+'</div><div class="load-info"><div class="load-name">'+d.name+(d.cashon?'<span class="badge cash">착불'+(d.cashamt?' '+Number(d.cashamt).toLocaleString()+'원':'')+'</span>':'')+(d.qty>1?'<span class="badge qty">×'+d.qty+'</span>':'')+(d.carried?'<span class="badge" style="background:#0e3a44;color:#67e8f9">인계'+(d.carriedSeq?' 원'+d.carriedSeq+'번':'')+'</span>':'')+'</div><div class="load-addr">'+d.addr+'</div>'+(d.product?'<div class="load-prod">'+d.product+'</div>':'')+'</div><div class="load-right"><div class="load-seq">배송<br><b>'+delivSeq+'번</b></div>'+(loadSortMode==='order'?'<div style="font-size:11px;color:#facc15;font-weight:700;margin-top:2px">'+t4+'</div>':'')+'</div></div>'});
+    if(unassigned.length){h+='<div style="padding:8px 16px;font-size:11px;color:#f97316;background:#1a0e00;border-top:2px solid #f97316">⚠️ 순번 미지정 '+unassigned.length+'건</div>';unassigned.forEach(function(d){h+='<div class="load-item"><div class="load-num" style="background:#2a1a00;color:#f97316">?</div><div class="load-info"><div class="load-name">'+d.name+(d.carried?'<span class="badge" style="background:#0e3a44;color:#67e8f9">인계'+(d.carriedSeq?' 원'+d.carriedSeq+'번':'')+'</span>':'')+'</div><div class="load-addr">'+d.addr+'</div></div><div class="load-right"><div style="color:#f97316;font-size:11px">미지정</div></div></div>'})}
+    if(R.length){h+='<div style="padding:8px 16px;font-size:11px;color:#a78bfa;background:#1a1030;border-top:2px solid #a78bfa">↩ 반품 수거 '+R.length+'건</div>';R.forEach(function(r){var isDone=retDoneMap[r.id];h+='<div class="load-item" style="'+(isDone?'opacity:0.4;':'')+'"><div class="load-num" style="background:'+(isDone?'#22c55e':'#7c3aed')+';color:white;border-radius:4px">↩</div><div class="load-info"><div class="load-name">'+r.name+'<span class="badge ret">반품</span></div><div class="load-addr">'+r.addr+'</div>'+(r.reason?'<div class="load-prod" style="color:#a78bfa">'+r.reason+'</div>':'')+'</div><div class="load-right"><div style="font-size:10px;color:#64748b">'+(r.tracking?String(r.tracking).slice(-4):'')+'</div></div></div>'})}
+  }
+  document.getElementById('load-list').innerHTML=h;
+}
+window.setLoadSort=function(mode){loadSortMode=mode;renderLoad()};
+
+function showAddrModal(failed){
+  failedAddrs=failed;var h='';
+  failed.forEach(function(item,idx){
+    h+='<div class="addr-fix-item" id="af-'+idx+'">'
+      +'<div class="addr-fix-name">'+item.name+(item.product?' · '+item.product:'')+'</div>'
+      +'<div class="addr-fix-orig">원본: '+item.addr+'</div>'
+      +'<div class="addr-fix-hint">💡 건물명·층수 빼고 도로명+번지만 입력해보세요</div>'
+      +'<input class="addr-fix-input" type="text" id="af-input-'+idx+'" value="'+item.addr+'">'
+      +'<div class="addr-fix-btns">'
+      +'<a class="addr-kakao-btn" id="af-kakao-'+idx+'" href="https://map.kakao.com/?q='+encodeURIComponent(item.addr)+'" target="_blank">🗺️ 확인</a>'
+      +'<button class="addr-confirm-btn" onclick="confirmAddr('+idx+')">✅ 핀 생성</button>'
+      +'<button class="addr-skip-btn" onclick="skipAddr('+idx+')">건너뛰기</button>'
+      +'</div>'
+      +'<div class="addr-status" id="af-status-'+idx+'" style="display:none"></div>'
+      +'</div>';
+  });
+  document.getElementById('addr-fix-list').innerHTML=h;
+  failed.forEach(function(item,idx){
+    var input=document.getElementById('af-input-'+idx);
+    if(input)input.addEventListener('input',function(){var link=document.getElementById('af-kakao-'+idx);if(link)link.href='https://map.kakao.com/?q='+encodeURIComponent(input.value)});
+  });
+  document.getElementById('addr-modal').classList.add('show');
+}
+window.confirmAddr=function(idx){
+  var input=document.getElementById('af-input-'+idx);
+  var newAddr=input.value.trim();if(!newAddr)return;
+  var statusEl=document.getElementById('af-status-'+idx);
+  var btn=document.querySelector('#af-'+idx+' .addr-confirm-btn');
+  statusEl.style.display='block';statusEl.className='addr-status trying';statusEl.textContent='🔍 찾는 중...';btn.disabled=true;
+  geocode(newAddr).then(function(c){
+    if(c){
+      var item=failedAddrs[idx];var d=D.find(function(x){return x.id===item.id});
+      if(d){d.addr=newAddr;save(currentKey+'_data',D);putMarker(d,c)}
+      statusEl.className='addr-status ok';statusEl.textContent='✅ 핀 생성 완료!';btn.disabled=false;
+      document.getElementById('af-'+idx).classList.add('fixed');
+    }else{
+      statusEl.className='addr-status fail';statusEl.textContent='❌ 못 찾았어요. 더 짧게 수정해보세요.';btn.disabled=false;
+    }
+  });
+};
+window.skipAddr=function(idx){
+  var el=document.getElementById('af-'+idx);if(el)el.classList.add('skipped');
+  var s=document.getElementById('af-status-'+idx);
+  if(s){s.style.display='block';s.style.background='#1a1a1a';s.style.color='#64748b';s.textContent='⏭ 건너뜀 — 순번탭에서 나중에 처리'}
+};
+window.closeAddrModal=function(){document.getElementById('addr-modal').classList.remove('show')};
+
+window.openMergeModal=function(){
+  var sessions=recoverSessions().filter(function(s){return s.key!==currentKey});
+  var html='';
+  if(!sessions.length){html='<div style="padding:20px;text-align:center;color:#64748b">합칠 수 있는 다른 배송이 없어요.</div>'}
+  sessions.forEach(function(s){
+    var data=load(s.key+'_data',[]);
+    var done=load(s.key+'_done',{});
+    var undone=data.filter(function(d){return !done[d.id]});
+    html+='<div style="background:#1a1d27;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid #2a2d3a">'
+      +'<div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:4px">🚚 '+s.title+'</div>'
+      +'<div style="font-size:11px;color:#64748b;margin-bottom:10px">미배송 '+undone.length+'건</div>'
+      +(undone.length?'<button onclick="mergeFromSession(\''+s.key+'\')" style="width:100%;padding:9px;background:#0e7490;color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">🔗 이 배송에서 가져오기</button>':'<div style="font-size:11px;color:#22c55e">✅ 미배송 건 없음</div>')
+      +'</div>';
+  });
+  document.getElementById('merge-list').innerHTML=html;
+  document.getElementById('merge-modal').style.display='flex';
+};
+window.closeMergeModal=function(){document.getElementById('merge-modal').style.display='none'};
+
+window.mergeFromSession=function(srcKey){
+  var data=load(srcKey+'_data',[]);
+  var done=load(srcKey+'_done',{});
+  var order=load(srcKey+'_order',{});
+  var undone=data.filter(function(d){return !done[d.id]});
+  if(!undone.length){alert('가져올 미배송 건이 없어요.');return}
+  if(!confirm(undone.length+'건을 오늘 배송에 합칠까요?\n비어있는 순번은 어제 순번 그대로 유지됩니다.'))return;
+  var newItems=[];
+  undone.forEach(function(d){
+    var newId=uid();
+    var oldSeq=order[d.id]||null;
+    var nd={id:newId,name:d.name,addr:d.addr,phone:d.phone,product:d.product,tracking:d.tracking,qty:d.qty,cashon:d.cashon,cashamt:d.cashamt,carried:true,carriedSeq:oldSeq};
+    D.push(nd);newItems.push(nd);
+    if(oldSeq&&Object.values(orderMap).indexOf(oldSeq)<0){orderMap[newId]=oldSeq}
+  });
+  save(currentKey+'_data',D);save(currentKey+'_order',orderMap);
+  var seqs=Object.values(orderMap).filter(function(v){return typeof v==='number'});
+  nextSeq=seqs.length?Math.max.apply(null,seqs)+1:1;
+  closeMergeModal();
+  updateCount();updHint();
+  loadMarkersWithFailCheck(newItems);
+  alert('🔗 '+undone.length+'건 합쳐졌어요!');
+};
+
+document.getElementById('xl-input').addEventListener('change',function(e){
+  var file=e.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      var wb=XLSX.read(ev.target.result,{type:'binary'});var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      function cs(v){return(v===null||v===undefined)?'':String(v).trim()}
+      var hr=-1;
+      for(var i=0;i<rows.length;i++){var r=rows[i];if(!r||!Array.isArray(r))continue;var joined=r.map(function(c){return cs(c)}).join('|');if(joined.indexOf('운송장')>=0||(joined.indexOf('받는사람')>=0&&joined.indexOf('주소')>=0)){hr=i;break}}
+      if(hr===-1){alert('헤더 행을 찾지 못했어요.');return}
+      var hs=rows[hr].map(function(h){return cs(h)});
+      function gi(){for(var ni=0;ni<arguments.length;ni++){for(var hi=0;hi<hs.length;hi++){if(hs[hi].indexOf(arguments[ni])>=0)return hi}}return -1}
+      var iN=gi('받는사람'),iA=gi('주소','받는사람주소'),iP=gi('도착전화번호','배송전화번호','받는사람전화');
+      var iPr=gi('상품명','품명'),iPr2=gi('등록품명'),iT=gi('운송장번호','운송장','송장'),iQ=gi('수량'),iCA=gi('현/착','구분'),iAmt=gi('착불금액','도선료','총운임','금액');
+      var nd=[];
+      for(var ri=hr+1;ri<rows.length;ri++){
+        var row=rows[ri];if(!row||!Array.isArray(row))continue;
+        var addr=iA>=0?cs(row[iA]):'';if(!addr||addr==='-')continue;
+        var name=iN>=0?(cs(row[iN])||'이름없음'):'이름없음';
+        var product='';if(iPr>=0)product=cs(row[iPr]);if(!product&&iPr2>=0)product=cs(row[iPr2]);
+        var cashStr=iCA>=0?cs(row[iCA]):'';var isCash=cashStr==='착불';
+        var cashAmt=isCash&&iAmt>=0?Number(cs(row[iAmt]).replace(/[^0-9]/g,''))||0:0;
+        nd.push({id:uid(),name:name,addr:addr,phone:iP>=0?cs(row[iP]):'',product:product,tracking:iT>=0?cs(row[iT]):'',qty:iQ>=0?(Number(row[iQ])||1):1,cashon:isCash,cashamt:cashAmt});
+      }
+      if(!nd.length){alert('데이터를 찾을 수 없어요.');return}
+      if(!confirm('엑셀 '+nd.length+'건을 추가할까요?'))return;
+      nd.forEach(function(d){D.push(d)});save(currentKey+'_data',D);updateCount();
+      loadMarkersWithFailCheck(nd);
+    }catch(err){alert('파일 오류: '+err.message)}
+  };
+  reader.readAsBinaryString(file);e.target.value='';
+});
+
+async function loadMarkersWithFailCheck(items){
+  var sb=document.getElementById('status');sb.style.display='block';var failed=[];
+  for(var i=0;i<items.length;i++){var d=items[i];sb.textContent='주소 변환 중 '+(i+1)+'/'+items.length+' — '+d.name;var c=await geocode(d.addr);if(c){putMarker(d,c)}else{failed.push(d)}await new Promise(function(r){setTimeout(r,80)})}
+  sb.style.display='none';updateCount();
+  var coords=Object.values(coordCache);
+  if(coords.length>1){var bounds=new kakao.maps.LatLngBounds();coords.forEach(function(c){bounds.extend(new kakao.maps.LatLng(c.lat,c.lng))});map.setBounds(bounds);}
+  goTab('map');
+  if(failed.length>0)setTimeout(function(){showAddrModal(failed)},500);
+}
+function imgToBase64(file){return new Promise(function(res){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1])};r.readAsDataURL(file)})}
+async function scanWaybill(file){
+  var base64=await new Promise(function(res){var r=new FileReader();r.onload=function(e){res(e.target.result.split(',')[1])};r.readAsDataURL(file)});
+  var mediaType=file.type||'image/jpeg';
+  var resp=await fetch('https://ihyeong-proxy.mjsoss.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mediaType,data:base64}},{type:'text',text:'이 송장 이미지에서 배송 정보를 추출해주세요. 반드시 JSON 형식으로만 답하세요.\n{"name":"받는사람이름","addr":"받는사람전체주소","phone":"전화번호","tracking":"운송장번호","product":"품명","cashon":false,"cashamt":0}\n착불이면 cashon을 true로, 착불금액이 있으면 cashamt에 숫자로. 정보가 없는 항목은 빈 문자열로.'}]}]})});
+  var rawText=await resp.text();
+  var data;
+  try{data=JSON.parse(rawText);}catch(e){throw new Error('응답파싱실패: '+rawText.slice(0,100));}
+  if(data.error){throw new Error(data.error.message||'API오류:'+JSON.stringify(data.error));}
+  if(!data.content||!data.content.length){throw new Error('content없음: '+rawText.slice(0,200));}
+  var text=data.content.map(function(i){return i.text||''}).join('').replace(/```json|```/g,'').trim();
+  try{return JSON.parse(text);}catch(e){throw new Error('JSON파싱실패: '+text.slice(0,100));}
+}
+function renderScanList(){var el=document.getElementById('scan-list');if(!scanItems.length){el.innerHTML='';return}var h='';scanItems.forEach(function(item,idx){var ok=item.addr&&item.name;h+='<div class="scan-item '+(ok?'ok':'err')+'" id="si-'+idx+'"><div class="scan-item-head"><span style="font-size:12px;font-weight:700;color:#f1f5f9">'+(idx+1)+'번째 송장</span><div style="display:flex;gap:6px;align-items:center"><span class="scan-item-status '+(ok?'ok':'err')+'">'+(ok?'✅ 인식됨':'⚠️ 확인필요')+'</span><button class="scan-del-btn" onclick="deleteScanItem('+idx+')">삭제</button></div></div><div class="scan-field"><label>받는사람</label><input type="text" value="'+esc(item.name||'')+'" oninput="updateScanItem('+idx+',\'name\',this.value)"></div><div class="scan-field"><label>주소</label><input type="text" value="'+esc(item.addr||'')+'" oninput="updateScanItem('+idx+',\'addr\',this.value)"></div><div class="scan-field"><label>전화번호</label><input type="text" value="'+esc(item.phone||'')+'" oninput="updateScanItem('+idx+',\'phone\',this.value)"></div><div class="scan-field"><label>송장번호</label><input type="text" value="'+esc(item.tracking||'')+'" oninput="updateScanItem('+idx+',\'tracking\',this.value)"></div><div class="scan-field"><label>품명</label><input type="text" value="'+esc(item.product||'')+'" oninput="updateScanItem('+idx+',\'product\',this.value)"></div><button class="scan-add-btn" onclick="addScanItem('+idx+')">➕ 지도에 추가</button></div>'});el.innerHTML=h}
+function esc(s){return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+window.updateScanItem=function(idx,key,val){scanItems[idx][key]=val;var el=document.getElementById('si-'+idx);if(el){var ok=scanItems[idx].addr&&scanItems[idx].name;el.className='scan-item '+(ok?'ok':'err')}};
+window.deleteScanItem=function(idx){scanItems.splice(idx,1);renderScanList()};
+window.addScanItem=function(idx){var item=scanItems[idx];if(!item.addr){alert('주소를 입력해주세요!');return}if(!item.name){alert('이름을 입력해주세요!');return}var seqInput=prompt('끼워넣을 순번을 입력하세요.\n(비우면 마지막)','');var d={id:uid(),name:item.name,addr:item.addr,phone:item.phone||'',product:item.product||'',tracking:item.tracking||'',qty:1,cashon:item.cashon||false,cashamt:item.cashamt||0};D.push(d);save(currentKey+'_data',D);if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}scanItems.splice(idx,1);renderScanList();geocode(d.addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}});updateCount();alert('✅ '+d.name+' 추가됐어요!')};
+function handleImageFile(file){if(!file)return;document.getElementById('scan-list').insertAdjacentHTML('afterbegin','<div class="scan-loading">🤖 AI가 송장을 읽는 중...<br><small>잠시만 기다려주세요</small></div>');scanWaybill(file).then(function(result){
+  document.querySelector('.scan-loading')&&document.querySelector('.scan-loading').remove();
+  scanItems.unshift(result);renderScanList();
+}).catch(function(err){
+  document.querySelector('.scan-loading')&&document.querySelector('.scan-loading').remove();
+  // 실패해도 빈 폼 보여주기 (alert 없이)
+  scanItems.unshift({name:'',addr:'',phone:'',tracking:'',product:'',cashon:false,cashamt:0});
+  renderScanList();
+  console.error('AI 인식 오류:', err);
+  // 상태바에 에러 표시
+  var sb=document.getElementById('status');
+  if(sb){sb.style.display='block';sb.style.background='#7f1d1d';sb.textContent='❌ AI 오류: '+err.message+' — 직접 입력해주세요';}
+  setTimeout(function(){if(sb)sb.style.display='none';},5000);
+})}
+document.getElementById('cam-input').addEventListener('change',function(e){handleImageFile(e.target.files[0]);e.target.value=''});
+document.getElementById('gal-input').addEventListener('change',function(e){handleImageFile(e.target.files[0]);e.target.value=''});
+window.addManual=function(){var name=document.getElementById('m-name').value.trim();var addr=document.getElementById('m-addr').value.trim();var phone=document.getElementById('m-phone').value.trim();var tracking=document.getElementById('m-tracking').value.trim();var product=document.getElementById('m-product').value.trim();var cashamt=Number(document.getElementById('m-cashamt').value)||0;var seqInput=document.getElementById('m-seq').value.trim();if(!name){alert('이름을 입력해주세요!');return}if(!addr){alert('주소를 입력해주세요!');return}var d={id:uid(),name:name,addr:addr,phone:phone,product:product,tracking:tracking,qty:1,cashon:cashamt>0,cashamt:cashamt};D.push(d);save(currentKey+'_data',D);if(seqInput&&!isNaN(Number(seqInput))){var insertAt=Number(seqInput);Object.keys(orderMap).forEach(function(id){if(orderMap[id]>=insertAt)orderMap[id]+=1});orderMap[d.id]=insertAt;nextSeq=Math.max.apply(null,Object.values(orderMap))+1;save(currentKey+'_order',orderMap)}document.getElementById('m-name').value='';document.getElementById('m-addr').value='';document.getElementById('m-phone').value='';document.getElementById('m-tracking').value='';document.getElementById('m-product').value='';document.getElementById('m-cashamt').value='';document.getElementById('m-seq').value='';geocode(addr).then(function(c){if(c){putMarker(d,c);refreshIcons()}else{alert('⚠️ 주소를 찾지 못했어요.')}});updateCount();alert('✅ '+d.name+' 추가됐어요!')};
+window.addReturn=function(){var name=document.getElementById('r-name').value.trim();var addr=document.getElementById('r-addr').value.trim();var phone=document.getElementById('r-phone').value.trim();var tracking=document.getElementById('r-tracking').value.trim();var reason=document.getElementById('r-reason').value.trim();if(!addr){alert('주소를 입력해주세요!');return}if(!name)name='이름없음';var r={id:'r'+uid(),name:name,addr:addr,phone:phone,tracking:tracking,reason:reason};R.push(r);save(currentKey+'_ret',R);document.getElementById('r-name').value='';document.getElementById('r-addr').value='';document.getElementById('r-phone').value='';document.getElementById('r-tracking').value='';document.getElementById('r-reason').value='';geocode(addr).then(function(c){if(c)putRetMarker(r,c)});updateCount();alert('↩ '+r.name+' 반품 등록됐어요!')};
+async function geocode(addr){if(coordCache[addr])return coordCache[addr];try{var res=await fetch('https://dapi.kakao.com/v2/local/search/address.json?query='+encodeURIComponent(addr),{headers:{'Authorization':'KakaoAK '+KK}});var j=await res.json();if(j.documents&&j.documents[0]){var c={lat:parseFloat(j.documents[0].y),lng:parseFloat(j.documents[0].x)};coordCache[addr]=c;save(currentKey+'_coords',coordCache);return c}}catch(e){}return null}
+async function loadMarkers(){
+  if(!D.length&&!R.length)return;
+  var sb=document.getElementById('status');sb.style.display='block';
+  var all=D.concat(R);
+  for(var i=0;i<all.length;i++){var item=all[i];var c=await geocode(item.addr);sb.textContent='주소 변환 중 '+(i+1)+'/'+all.length+' — '+item.name;if(c){if(item.id.startsWith('r'))putRetMarker(item,c);else putMarker(item,c)}await new Promise(function(r){setTimeout(r,80)})}
+  sb.style.display='none';updateCount();
+  var coords=Object.values(coordCache);
+  if(coords.length>1){var bounds=new kakao.maps.LatLngBounds();coords.forEach(function(c){bounds.extend(new kakao.maps.LatLng(c.lat,c.lng))});map.setBounds(bounds);}
+}
+renderHome();
+</script>
+</body>
+</html>
