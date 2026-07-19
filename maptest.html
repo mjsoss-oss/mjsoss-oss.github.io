@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>카카오맵 테스트</title>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=ea5e3391e6bf9d1900532e1b6b7780cf"></script>
+</head>
+<body style="margin:0;padding:0;">
+<div style="background:#eee;padding:10px;font-size:14px;">
+  카카오맵 기본 테스트 — 지도가 보이면 성공!
+</div>
+<div id="map" style="width:100%;height:calc(100vh - 40px);"></div>
+<script>
+  var container = document.getElementById('map');
+  var options = {
+    center: new kakao.maps.LatLng(37.556, 126.920),
+    level: 5
+  };
+  var map = new kakao.maps.Map(container, options);
+  document.querySelector('div').textContent = '지도 생성 완료! 크기: '+container.offsetWidth+'x'+container.offsetHeight;
+</script>
+</body>
+</html>
