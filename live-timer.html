@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>방송 경과시간</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #box {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    font-weight: 800;
+    color: #ffffff;
+    background: rgba(0,0,0,0.55);
+    padding: 14px 28px;
+    border-radius: 16px;
+    font-size: 42px;
+    text-align: center;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    white-space: nowrap;
+  }
+  #label {
+    font-size: 20px;
+    font-weight: 500;
+    color: #ffdd55;
+    display: block;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+  <div id="box">
+    <span id="clock">00:00:00:00</span>
+    <span id="label">🔴 방송중</span>
+  </div>
+
+<script>
+  // URL에 ?start=1735900000000 (밀리초 단위 타임스탬프) 형식으로 시작 시각을 넣어주세요.
+  // 예: live-timer.html?start=1735900000000
+  // start 파라미터가 없으면 이 페이지를 처음 연 시각을 시작 시각으로 사용합니다.
+  const params = new URLSearchParams(window.location.search);
+  let startTime;
+
+  if (params.has('start')) {
+    startTime = parseInt(params.get('start'), 10);
+  } else {
+    // localStorage 대신 세션 내에서만 유지 (오버레이가 새로고침되면 리셋될 수 있으므로
+    // 가급적 start 파라미터를 직접 넣어 사용하는 것을 권장합니다)
+    startTime = Date.now();
+  }
+
+  function pad(n) {
+    return n.toString().padStart(2, '0');
+  }
+
+  function update() {
+    const now = Date.now();
+    let diff = Math.max(0, now - startTime);
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    diff -= days * 1000 * 60 * 60 * 24;
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    diff -= hours * 1000 * 60 * 60;
+
+    const minutes = Math.floor(diff / (1000 * 60));
+    diff -= minutes * 1000 * 60;
+
+    const seconds = Math.floor(diff / 1000);
+
+    let text;
+    if (days > 0) {
+      text = `${days}일 ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    } else {
+      text = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+
+    document.getElementById('clock').textContent = text;
+  }
+
+  update();
+  setInterval(update, 1000);
+</script>
+</body>
+</html>
